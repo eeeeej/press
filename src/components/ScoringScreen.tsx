@@ -1,0 +1,519 @@
+import React, { useState, useEffect } from 'react';
+import { Player, Course, Game, HoleScore, PlayerScore } from '../types';
+import { calculateHandicapDiff, calculateBankerMatches, getNextBanker } from '../utils/gameLogic';
+import { Minus, Plus, Crown, ArrowLeft, ArrowRight, DollarSign, Zap } from 'lucide-react';
+
+interface ScoringScreenProps {
+  game: Game;
+  course: Course;
+  onGameUpdate: (game: Game) => void;
+  onFinishGame: () => void;
+  onBack: () => void;
+}
+
+export default function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: ScoringScreenProps) {
+  const [currentScores, setCurrentScores] = useState<PlayerScore[]>([]);
+  const [defaultBetAmount, setDefaultBetAmount] = useState<number>(1);
+  const [playerBets, setPlayerBets] = useState<{ [playerId: string]: number }>({});
+  const [bankerPressed, setBankerPressed] = useState<boolean>(false);
+  const [showBankerSelection, setShowBankerSelection] = useState(false);
+  const [selectedBankerId, setSelectedBankerId] = useState<string>('');
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+
+  const currentHole = course.holes.find(h => h.number === game.currentHole);
+  const isLastHole = game.currentHole === course.holes.length;
+  
+  // Arrange players in banker order
+  const orderedPlayers = React.useMemo(() => {
+    const ordered = [...game.bankerOrder.map(id => game.players.find(p => p.id === id)!).filter(Boolean)];
+    // Add any players not in banker order (shouldn't happen but safety check)
+    game.players.forEach(player => {
+      if (!ordered.find(p => p.id === player.id)) {
+        ordered.push(player);
+      }
+    });
+    return ordered;
+  }, [game.players, game.bankerOrder]);
+  
+  // Calculate running totals for each player through current hole
+  const calculateRunningTotal = (playerId: string): number => {
+    let total = 0;
+    for (let holeNum = 1; holeNum < game.currentHole; holeNum++) {
+      const holeScore = game.holeScores.find(hs => hs.holeNumber === holeNum);
+      if (holeScore) {
+        holeScore.matches.forEach(match => {
+          if (match.bankerId === playerId) {
+            total += match.result;
+          } else if (match.playerId === playerId) {
+            total -= match.result;
+          }
+        });
+      }
+    }
+    return total;
+  };
+  
+  // Pure function to get banker without side effects
+  const getBankerForHole = (selectedBankerId?: string): Player => {
+    const existingHoleScore = game.holeScores.find(hs => hs.holeNumber === game.currentHole);
+    if (existingHoleScore) {
+      return orderedPlayers.find(p => p.id === existingHoleScore.bankerId)!;
+    }
+
+    const { bankerId, isManualSelection } = getNextBanker(
+      orderedPlayers,
+      game.bankerOrder,
+      game.currentHole,
+      course.holes.length
+    );
+
+    const finalBankerId = isManualSelection && selectedBankerId ? selectedBankerId : bankerId;
+    return orderedPlayers.find(p => p.id === finalBankerId)!;
+  };
+  
+  // Initialize scores for current hole
+  useEffect(() => {
+    if (!currentHole) return;
+    
+    const existingHoleScore = game.holeScores.find(hs => hs.holeNumber === game.currentHole);
+    
+    if (existingHoleScore) {
+      setCurrentScores(existingHoleScore.playerScores);
+      setDefaultBetAmount(existingHoleScore.betAmount);
+      setBankerPressed(existingHoleScore.bankerPressed);
+      
+      // Set individual player bets from existing data
+      const bets: { [playerId: string]: number } = {};
+      orderedPlayers.forEach(player => {
+        const match = existingHoleScore.matches.find(m => m.playerId === player.id || m.bankerId === player.id);
+        bets[player.id] = match?.betAmount || existingHoleScore.betAmount;
+      });
+      setPlayerBets(bets);
+    } else {
+      // Get the previous hole's bet amount or use the current default
+      const previousHole = game.holeScores
+        .filter(hs => hs.holeNumber < game.currentHole)
+        .sort((a, b) => b.holeNumber - a.holeNumber)[0];
+      
+      if (previousHole) {
+        setDefaultBetAmount(previousHole.betAmount);
+      }
+      // Check if manual banker selection is needed
+      const { bankerId, isManualSelection } = getNextBanker(
+        orderedPlayers,
+        game.bankerOrder,
+        game.currentHole,
+        course.holes.length
+      );
+
+      if (isManualSelection && !selectedBankerId) {
+        setShowBankerSelection(true);
+        return; // Don't initialize scores until banker is selected
+      }
+
+      const banker = getBankerForHole(selectedBankerId);
+      const initialScores: PlayerScore[] = orderedPlayers.map(player => {
+        const handicapDiff = calculateHandicapDiff(
+          banker.handicap,
+          player.handicap,
+          currentHole.handicap
+        );
+        
+        return {
+          playerId: player.id,
+          score: currentHole.par, // Default to par
+          handicapDiff,
+          pressed: false
+        };
+      });
+      setCurrentScores(initialScores);
+      setDefaultBetAmount(1);
+      setBankerPressed(false);
+      
+      // Initialize player bets with carried over default amount
+      const bets: { [playerId: string]: number } = {};
+      orderedPlayers.forEach(player => {
+        // Use the current defaultBetAmount which was set from the previous hole
+        bets[player.id] = defaultBetAmount;
+      });
+      setPlayerBets(bets);
+    }
+  }, [game.currentHole, orderedPlayers, selectedBankerId]);
+
+  const updateScore = (playerId: string, newScore: number) => {
+    setCurrentScores(prev => prev.map(ps => 
+      ps.playerId === playerId ? { ...ps, score: Math.max(1, newScore) } : ps
+    ));
+  };
+
+  const updatePlayerBet = (playerId: string, betAmount: number) => {
+    setPlayerBets(prev => ({
+      ...prev,
+      [playerId]: Math.max(1, betAmount)
+    }));
+  };
+
+  const togglePress = (playerId: string) => {
+    setCurrentScores(prev => prev.map(ps => 
+      ps.playerId === playerId ? { ...ps, pressed: !ps.pressed } : ps
+    ));
+  };
+
+  const handleLongPressStart = (playerId: string) => {
+    const timer = setTimeout(() => {
+      setSelectedBankerId(playerId);
+      setShowBankerSelection(true);
+    }, 800); // 800ms long press
+    setLongPressTimer(timer);
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+  };
+
+  // Calculate total wagered amount for this hole
+  const calculateTotalWagered = (): number => {
+    let total = 0;
+    orderedPlayers.forEach(player => {
+      if (player.id !== getBankerForHole(selectedBankerId).id) {
+        let betAmount = playerBets[player.id] || defaultBetAmount;
+        const playerScore = currentScores.find(ps => ps.playerId === player.id);
+        if (playerScore?.pressed) betAmount *= 2;
+        if (bankerPressed) betAmount *= 2;
+        total += betAmount;
+      }
+    });
+    return total;
+  };
+
+  const saveHoleAndContinue = () => {
+    if (!currentHole) return;
+
+    const banker = getBankerForHole(selectedBankerId);
+    
+    // Get the bet amount to use (either from state or previous hole)
+    const betAmountToUse = defaultBetAmount;
+    
+    // Create modified scores with individual bet amounts for calculation
+    const scoresWithBets = currentScores.map(score => ({
+      ...score,
+      betAmount: playerBets[score.playerId] || betAmountToUse
+    }));
+    
+    const matches = calculateBankerMatches(currentHole, banker, orderedPlayers, scoresWithBets, betAmountToUse, bankerPressed);
+
+    const holeScore: HoleScore = {
+      holeNumber: game.currentHole,
+      bankerId: banker.id,
+      playerScores: currentScores,
+      matches,
+      betAmount: betAmountToUse,
+      bankerPressed
+    };
+
+    const updatedHoleScores = game.holeScores.filter(hs => hs.holeNumber !== game.currentHole);
+    updatedHoleScores.push(holeScore);
+
+    const updatedGame: Game = {
+      ...game,
+      holeScores: updatedHoleScores,
+      currentHole: isLastHole ? game.currentHole : game.currentHole + 1
+    };
+
+    onGameUpdate(updatedGame);
+
+    if (isLastHole) {
+      onFinishGame();
+    } else {
+      setShowBankerSelection(false);
+      setSelectedBankerId('');
+    }
+  };
+
+  const goToPreviousHole = () => {
+    if (game.currentHole > 1) {
+      const updatedGame: Game = {
+        ...game,
+        currentHole: game.currentHole - 1
+      };
+      onGameUpdate(updatedGame);
+      setShowBankerSelection(false);
+      setSelectedBankerId('');
+    }
+  };
+
+  if (!currentHole) return null;
+
+  if (showBankerSelection) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-green-100 p-4">
+        <div className="max-w-lg mx-auto">
+          <div className="bg-white rounded-2xl shadow-xl p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">
+              Select Banker for Hole {game.currentHole}
+            </h2>
+            <p className="text-gray-600 text-center mb-6">
+              Manual selection required for remaining holes
+            </p>
+            <div className="space-y-3">
+              {orderedPlayers.map(player => (
+                <button
+                  key={player.id}
+                  onClick={() => setSelectedBankerId(player.id)}
+                  className={`w-full p-4 rounded-xl border-2 transition-all ${
+                    selectedBankerId === player.id
+                      ? 'border-emerald-500 bg-emerald-50'
+                      : 'border-gray-200 hover:border-emerald-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <Crown className="w-5 h-5 text-amber-500" />
+                      <div className="text-left">
+                        <div className="font-semibold">{player.displayName}</div>
+                        <div className="text-sm text-gray-600">Handicap: {player.handicap}</div>
+                      </div>
+                    </div>
+                    {selectedBankerId === player.id && (
+                      <div className="w-5 h-5 bg-emerald-600 rounded-full flex items-center justify-center">
+                        <div className="w-2 h-2 bg-white rounded-full" />
+                      </div>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowBankerSelection(false)}
+              disabled={!selectedBankerId}
+              className="w-full mt-6 bg-emerald-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Confirm Banker
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const banker = getBankerForHole(selectedBankerId);
+  const totalWagered = calculateTotalWagered();
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-green-100">
+      {/* Header */}
+      <div className="bg-white shadow-sm p-4">
+        <div className="max-w-lg mx-auto">
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={onBack}
+              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="text-center">
+              <h1 className="text-lg font-bold text-gray-900">{course.name}</h1>
+              <p className="text-sm text-gray-600">
+                Hole {currentHole.number} • Par {currentHole.par} • {currentHole.yards}y • HCP {currentHole.handicap}
+              </p>
+            </div>
+            <div className="w-9 h-9" /> {/* Spacer */}
+          </div>
+
+          {/* Default Bet Amount and Hole Navigation */}
+          <div className="flex items-center justify-between">
+            <button
+              onClick={goToPreviousHole}
+              disabled={game.currentHole === 1}
+              className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Prev</span>
+            </button>
+            
+            <div className="flex items-center space-x-4">
+              {/* Default Bet Amount */}
+              <div className="flex items-center space-x-2 bg-green-50 px-3 py-2 rounded-lg">
+                <DollarSign className="w-4 h-4 text-green-600" />
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={defaultBetAmount}
+                  onChange={(e) => {
+                    const newAmount = Math.max(1, parseInt(e.target.value) || 1);
+                    setDefaultBetAmount(newAmount);
+                    // Update all player bets to new default if they haven't been customized
+                    const updatedBets: { [playerId: string]: number } = {};
+                    orderedPlayers.forEach(player => {
+                      updatedBets[player.id] = newAmount;
+                    });
+                    setPlayerBets(updatedBets);
+                  }}
+                  className="w-12 text-center bg-transparent text-sm font-semibold text-green-700 border-none outline-none"
+                />
+              </div>
+              
+              {/* Total Wagered */}
+              <div className="flex items-center space-x-1 bg-purple-50 px-3 py-2 rounded-lg">
+                <span className="text-xs text-purple-600 font-medium">Wagered:</span>
+                <span className="text-sm font-bold text-purple-700">${totalWagered}</span>
+              </div>
+              
+              {/* Banker Info */}
+              <div className="flex items-center space-x-2">
+                <Crown className="w-4 h-4 text-amber-500" />
+                <span className="text-sm font-medium text-gray-700">
+                  {banker.displayName}
+                </span>
+              </div>
+            </div>
+            
+            <div className="text-sm text-gray-500">
+              {game.currentHole}/{course.holes.length}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Scoring Grid */}
+      <div className="p-4">
+        <div className="max-w-lg mx-auto">
+          <div className="bg-white rounded-2xl shadow-xl p-4">
+            <div className="grid gap-3">
+              {orderedPlayers.map(player => {
+                const playerScore = currentScores.find(ps => ps.playerId === player.id);
+                const isBanker = player.id === banker.id;
+                const handicapDiff = calculateHandicapDiff(banker.handicap, player.handicap, currentHole.handicap);
+                const runningTotal = calculateRunningTotal(player.id);
+                
+                return (
+                  <div
+                    key={player.id}
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 ${
+                      isBanker 
+                        ? 'border-amber-300 bg-amber-50' 
+                        : 'border-gray-200 bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div 
+                        className={`w-10 h-10 rounded-full flex items-center justify-center cursor-pointer ${
+                          isBanker ? 'bg-amber-100' : 'bg-emerald-100'
+                        }`}
+                        onMouseDown={() => handleLongPressStart(player.id)}
+                        onMouseUp={handleLongPressEnd}
+                        onMouseLeave={handleLongPressEnd}
+                        onTouchStart={() => handleLongPressStart(player.id)}
+                        onTouchEnd={handleLongPressEnd}
+                        title="Long press to select as banker"
+                      >
+                        {isBanker && <Crown className="w-5 h-5 text-amber-600" />}
+                        {!isBanker && (
+                          <span className="text-sm font-semibold text-emerald-600">
+                            {player.displayName.charAt(0)}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-900 flex items-center space-x-1">
+                          <span>{player.displayName}</span>
+                          {handicapDiff !== 0 && (
+                            <sup className={`ml-1 px-1.5 py-0.5 rounded-full text-xs font-bold ${
+                              handicapDiff > 0 ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              {handicapDiff > 0 ? '+' : ''}{handicapDiff}
+                            </sup>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-2 text-xs">
+                          <span className="text-gray-600">HCP: {player.handicap}</span>
+                          {game.currentHole > 1 && (
+                            <span className={`font-semibold ${
+                              runningTotal > 0 ? 'text-green-600' : 
+                              runningTotal < 0 ? 'text-red-600' : 'text-gray-600'
+                            }`}>
+                              Total: {runningTotal > 0 ? '+' : ''}{runningTotal}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      {/* Individual Bet Amount */}
+                      <div className="flex items-center space-x-1 bg-blue-50 px-2 py-1 rounded">
+                        <DollarSign className="w-3 h-3 text-blue-600" />
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={playerBets[player.id] || defaultBetAmount}
+                          onChange={(e) => updatePlayerBet(player.id, parseInt(e.target.value) || 1)}
+                          className="w-8 text-center bg-transparent text-xs font-semibold text-blue-700 border-none outline-none"
+                        />
+                      </div>
+                      
+                      {/* Press Button */}
+                      <button
+                        onClick={() => isBanker ? setBankerPressed(!bankerPressed) : togglePress(player.id)}
+                        className={`p-2 rounded-lg transition-all ${
+                          (isBanker ? bankerPressed : playerScore?.pressed)
+                            ? 'bg-red-100 text-red-600 shadow-md' 
+                            : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                        }`}
+                        title={isBanker ? "Press All Bets" : "Press Bet"}
+                      >
+                        <Zap className="w-4 h-4" />
+                      </button>
+                      
+                      {/* Score Controls */}
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => updateScore(player.id, (playerScore?.score || currentHole.par) - 1)}
+                          className="w-8 h-8 bg-red-100 text-red-600 rounded-full flex items-center justify-center hover:bg-red-200 transition-colors"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                        
+                        <div className="w-12 text-center">
+                          <div className="text-2xl font-bold text-gray-900">
+                            {playerScore?.score || currentHole.par}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {((playerScore?.score || currentHole.par) - currentHole.par) === 0 ? 'Par' :
+                             ((playerScore?.score || currentHole.par) - currentHole.par) > 0 ? 
+                             `+${(playerScore?.score || currentHole.par) - currentHole.par}` :
+                             `${(playerScore?.score || currentHole.par) - currentHole.par}`}
+                          </div>
+                        </div>
+                        
+                        <button
+                          onClick={() => updateScore(player.id, (playerScore?.score || currentHole.par) + 1)}
+                          className="w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center hover:bg-green-200 transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={saveHoleAndContinue}
+              className="w-full mt-6 bg-emerald-600 text-white py-4 px-6 rounded-xl font-semibold text-lg hover:bg-emerald-700 transition-colors flex items-center justify-center space-x-2"
+            >
+              <span>{isLastHole ? 'Finish Game' : 'Next Hole'}</span>
+              {!isLastHole && <ArrowRight className="w-5 h-5" />}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
