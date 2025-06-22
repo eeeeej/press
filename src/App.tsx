@@ -33,7 +33,9 @@ function App() {
       currentHole: 1,
       holeScores: [],
       gameType: 'banker',
-      createdAt: new Date()
+      status: 'in_progress',
+      createdAt: new Date(),
+      updatedAt: new Date().toISOString()
     };
 
     setCurrentGame(newGame);
@@ -41,11 +43,45 @@ function App() {
   };
 
   const handleGameUpdate = (updatedGame: Game) => {
-    setCurrentGame(updatedGame);
+    console.log('Updating game state:', {
+      currentHole: updatedGame.currentHole,
+      totalHoles: selectedCourse?.holes.length || 'N/A',
+      status: updatedGame.status,
+      holeScores: updatedGame.holeScores.length
+    });
+    
+    // Ensure we include the updatedAt timestamp
+    const gameWithUpdate = {
+      ...updatedGame,
+      updatedAt: new Date().toISOString()
+    };
+    
+    setCurrentGame(gameWithUpdate);
+    console.log('Game state updated');
+    return gameWithUpdate;
   };
 
   const handleFinishGame = () => {
-    setGameState('complete');
+    console.log('handleFinishGame called, setting gameState to complete');
+    
+    // Ensure we have the latest game state
+    setCurrentGame(prevGame => {
+      if (!prevGame) return null;
+      
+      console.log('Updating game status to completed');
+      return {
+        ...prevGame,
+        status: 'completed',
+        updatedAt: new Date().toISOString()
+      };
+    });
+    
+    // Use a small timeout to ensure state updates are processed
+    setTimeout(() => {
+      console.log('Setting gameState to complete');
+      setGameState('complete');
+      console.log('gameState set to complete');
+    }, 50);
   };
 
   const handleNewGame = () => {
@@ -62,7 +98,10 @@ function App() {
     setGameState('course');
   };
 
+  console.log('Rendering App with gameState:', gameState);
+
   if (gameState === 'players') {
+    console.log('Rendering PlayerManagement');
     return (
       <PlayerManagement
         players={players}
@@ -73,6 +112,7 @@ function App() {
   }
 
   if (gameState === 'course') {
+    console.log('Rendering CourseSelection');
     return (
       <CourseSelection
         courses={courses}
@@ -85,6 +125,7 @@ function App() {
   }
 
   if (gameState === 'playing' && currentGame && selectedCourse) {
+    console.log('Rendering ScoringScreen');
     return (
       <ScoringScreen
         game={currentGame}
@@ -97,6 +138,7 @@ function App() {
   }
 
   if (gameState === 'complete' && currentGame && selectedCourse) {
+    console.log('Rendering GameSummary');
     return (
       <GameSummary
         game={currentGame}
@@ -105,6 +147,8 @@ function App() {
       />
     );
   }
+
+  console.error('Unexpected state - gameState:', gameState, 'currentGame:', !!currentGame, 'selectedCourse:', !!selectedCourse);
 
   return null;
 }

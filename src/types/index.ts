@@ -47,6 +47,8 @@ export interface BankerMatch {
   bankerPressed: boolean;
 }
 
+export type GameStatus = 'in_progress' | 'completed';
+
 export interface Game {
   id: string;
   courseId: number;
@@ -55,7 +57,9 @@ export interface Game {
   currentHole: number;
   holeScores: HoleScore[];
   gameType: 'banker';
+  status: GameStatus;
   createdAt: Date;
+  updatedAt?: string; // Optional field for tracking updates
 }
 
 export interface GameSummary {
