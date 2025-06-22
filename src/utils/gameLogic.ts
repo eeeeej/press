@@ -8,7 +8,8 @@ export function calculateHandicapDiff(
   const handicapDiff = Math.abs(bankerHandicap - playerHandicap);
   
   if (handicapDiff >= holeHandicap) {
-    return bankerHandicap > playerHandicap ? 1 : -1;
+    // Adjust non-banker player's score based on handicap comparison
+    return bankerHandicap > playerHandicap ? -1 : 1;
   }
   
   return 0;
