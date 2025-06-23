@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Player, Course, Game, HoleScore, PlayerScore } from '../types';
 import { calculateHandicapDiff, calculateBankerMatches, getNextBanker } from '../utils/gameLogic';
 import { Minus, Plus, Crown, ArrowLeft, ArrowRight, DollarSign, Zap, LayoutGrid, List } from 'lucide-react';
@@ -7,11 +7,11 @@ interface ScoringScreenProps {
   game: Game;
   course: Course;
   onGameUpdate: (game: Game) => void;
-  onFinishGame: () => void;
+  onFinishGame: (game: Game) => void;
   onBack: () => void;
 }
 
-export default function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: ScoringScreenProps) {
+function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: ScoringScreenProps) {
   const [currentScores, setCurrentScores] = useState<PlayerScore[]>([]);
   const [defaultBetAmount, setDefaultBetAmount] = useState<number>(1);
   const [playerBets, setPlayerBets] = useState<{ [playerId: string]: number }>({});
@@ -19,22 +19,24 @@ export default function ScoringScreen({ game, course, onGameUpdate, onFinishGame
   const [showBankerSelection, setShowBankerSelection] = useState(false);
   const [selectedBankerId, setSelectedBankerId] = useState<string>('');
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [activeTab, setActiveTab] = useState<'current' | 'summary'>('current');
 
+  // Derived state and variables
   const currentHole = course.holes.find(h => h.number === game.currentHole);
   const isLastHole = game.currentHole === course.holes.length;
   
   // Arrange players in banker order
-  const orderedPlayers = React.useMemo(() => {
+  const orderedPlayers = useMemo(() => {
     const ordered = [...game.bankerOrder.map(id => game.players.find(p => p.id === id)!).filter(Boolean)];
     // Add any players not in banker order (shouldn't happen but safety check)
     game.players.forEach(player => {
-      if (!ordered.find(p => p.id === player.id)) {
+      if (!ordered.some(p => p.id === player.id)) {
         ordered.push(player);
       }
     });
     return ordered;
   }, [game.players, game.bankerOrder]);
-  
+
   // Calculate running totals for each player through current hole
   const calculateRunningTotal = (playerId: string): number => {
     let total = 0;
@@ -71,12 +73,29 @@ export default function ScoringScreen({ game, course, onGameUpdate, onFinishGame
     return orderedPlayers.find(p => p.id === finalBankerId)!;
   };
   
+  // Check if manual banker selection is needed
+  useEffect(() => {
+    if (currentHole && !game.holeScores.find(hs => hs.holeNumber === game.currentHole) && !selectedBankerId) {
+      const { isManualSelection } = getNextBanker(
+        orderedPlayers,
+        game.bankerOrder,
+        game.currentHole,
+        course.holes.length
+      );
+      
+      if (isManualSelection) {
+        setShowBankerSelection(true);
+      }
+    }
+  }, [currentHole, game.holeScores, orderedPlayers, selectedBankerId, game]);
+  
   // Initialize scores for current hole
   useEffect(() => {
-    // Make sure we have the current hole data before proceeding
-    const currentHoleData = course.holes.find(h => h.number === game.currentHole);
-    if (!currentHoleData) {
-      console.error('Could not find hole data for hole', game.currentHole);
+    if (!currentHole) {
+      setCurrentScores([]);
+      setDefaultBetAmount(1);
+      setBankerPressed(false);
+      setPlayerBets({});
       return;
     }
     
@@ -102,30 +121,17 @@ export default function ScoringScreen({ game, course, onGameUpdate, onFinishGame
       
       const betAmount = previousHole?.betAmount || 1;
       
-      // Check if manual banker selection is needed
-      const { isManualSelection } = getNextBanker(
-        orderedPlayers,
-        game.bankerOrder,
-        game.currentHole,
-        course.holes.length
-      );
-
-      if (isManualSelection && !selectedBankerId) {
-        setShowBankerSelection(true);
-        return; // Don't initialize scores until banker is selected
-      }
-
       const banker = getBankerForHole(selectedBankerId);
       const initialScores: PlayerScore[] = orderedPlayers.map(player => {
         const handicapDiff = calculateHandicapDiff(
           banker.handicap,
           player.handicap,
-          currentHoleData.handicap
+          currentHole.handicap
         );
         
         return {
           playerId: player.id,
-          score: currentHoleData.par, // Default to par
+          score: currentHole.par, // Default to par
           handicapDiff,
           pressed: false
         };
@@ -210,6 +216,17 @@ export default function ScoringScreen({ game, course, onGameUpdate, onFinishGame
       betAmount: playerBets[score.playerId] || betAmountToUse
     }));
     
+    // Check if we have scores for all players
+    const allPlayersHaveScores = game.players.every(player => 
+      currentScores.some(score => score.playerId === player.id)
+    );
+    
+    if (!allPlayersHaveScores) {
+      console.error('Not all players have scores');
+      alert('Please enter scores for all players before proceeding');
+      return;
+    }
+    
     const matches = calculateBankerMatches(currentHole, banker, orderedPlayers, scoresWithBets, betAmountToUse, bankerPressed);
 
     // Create the hole score for the current hole
@@ -219,7 +236,7 @@ export default function ScoringScreen({ game, course, onGameUpdate, onFinishGame
       playerScores: currentScores,
       matches,
       betAmount: betAmountToUse,
-      bankerPressed
+      bankerPressed: bankerPressed
     };
 
     // Update the hole scores array with the new score
@@ -229,28 +246,27 @@ export default function ScoringScreen({ game, course, onGameUpdate, onFinishGame
     const updatedGame: Game = {
       ...game,
       holeScores: updatedHoleScores,
-      // Don't increment currentHole if it's the last hole
-      currentHole: isLastHole ? game.currentHole : game.currentHole + 1,
-      // Mark as completed if it's the last hole
+      // Set the current hole correctly
+      currentHole: game.currentHole + 1,
+      // Mark as completed if we've just saved the last hole
       status: isLastHole ? 'completed' : 'in_progress',
       updatedAt: new Date().toISOString()
     };
 
     console.log('Saving hole score. Is last hole?', isLastHole, 'Hole number:', game.currentHole);
-    console.log('Updated hole scores:', updatedHoleScores);
+    console.log('Updated hole scores:', updatedHoleScores.length);
     
     try {
-      // Update the game state and wait for it to complete
+      // Update the game state
       console.log('Calling onGameUpdate...');
-      const savedGame = await onGameUpdate(updatedGame);
-      console.log('onGameUpdate completed', { savedGame });
+      // Handle the case where onGameUpdate might not return a value
+      onGameUpdate(updatedGame);
       
       if (isLastHole) {
-        console.log('Final hole completed. Calling onFinishGame...');
-        // Add a small delay to ensure state is properly updated
+        console.log('Final hole completed. Calling onFinishGame with updated game...');
+        // Pass the updated game directly to onFinishGame
         setTimeout(() => {
-          onFinishGame();
-          console.log('onFinishGame called');
+          onFinishGame(updatedGame);
         }, 100);
       } else {
         console.log('Moving to next hole');
@@ -274,66 +290,8 @@ export default function ScoringScreen({ game, course, onGameUpdate, onFinishGame
     }
   };
 
-  if (!currentHole) return null;
-
-  if (showBankerSelection) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-green-100 p-4">
-        <div className="max-w-lg mx-auto">
-          <div className="bg-white rounded-2xl shadow-xl p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">
-              Select Banker for Hole {game.currentHole}
-            </h2>
-            <p className="text-gray-600 text-center mb-6">
-              Manual selection required for remaining holes
-            </p>
-            <div className="space-y-3">
-              {orderedPlayers.map(player => (
-                <button
-                  key={player.id}
-                  onClick={() => setSelectedBankerId(player.id)}
-                  className={`w-full p-4 rounded-xl border-2 transition-all ${
-                    selectedBankerId === player.id
-                      ? 'border-emerald-500 bg-emerald-50'
-                      : 'border-gray-200 hover:border-emerald-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <Crown className="w-5 h-5 text-amber-500" />
-                      <div className="text-left">
-                        <div className="font-semibold">{player.displayName}</div>
-                        <div className="text-sm text-gray-600">Handicap: {player.handicap}</div>
-                      </div>
-                    </div>
-                    {selectedBankerId === player.id && (
-                      <div className="w-5 h-5 bg-emerald-600 rounded-full flex items-center justify-center">
-                        <div className="w-2 h-2 bg-white rounded-full" />
-                      </div>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setShowBankerSelection(false)}
-              disabled={!selectedBankerId}
-              className="w-full mt-6 bg-emerald-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Confirm Banker
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const banker = getBankerForHole(selectedBankerId);
-  const totalWagered = calculateTotalWagered();
-  const [activeTab, setActiveTab] = useState<'current' | 'summary'>('current');
-
   // Calculate game summary data for the summary tab
-  const gameSummary = React.useMemo(() => {
+  const gameSummary = useMemo(() => {
     const summaries = game.players.map(player => {
       let totalWinnings = 0;
       let holesWon = 0;
@@ -370,8 +328,8 @@ export default function ScoringScreen({ game, course, onGameUpdate, onFinishGame
   }, [game.players, game.holeScores]);
 
   // Calculate hole results for the summary view
-  const holeResults = React.useMemo(() => {
-    return Array.from({ length: 18 }, (_, i) => {
+  const holeResults = useMemo(() => {
+    return Array.from({ length: game.currentHole }, (_, i) => {
       const holeNumber = i + 1;
       const holeScore = game.holeScores.find(hs => hs.holeNumber === holeNumber);
       const holeResults: { [playerId: string]: { score: number; amount: number } } = {};
@@ -405,6 +363,64 @@ export default function ScoringScreen({ game, course, onGameUpdate, onFinishGame
     });
   }, [game.holeScores, game.players, course.holes]);
 
+  if (!currentHole) {
+    return <div>Loading hole data...</div>;
+  }
+
+  if (showBankerSelection) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-green-100 p-4">
+        <div className="max-w-lg mx-auto">
+          <div className="bg-white rounded-2xl shadow-xl p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">
+              Select Banker for Hole {game.currentHole}
+            </h2>
+            <p className="text-gray-600 text-center mb-6">
+              Manual selection required for remaining holes
+            </p>
+            <div className="space-y-3">
+              {orderedPlayers.map(player => (
+                <button
+                  key={player.id}
+                  onClick={() => setSelectedBankerId(player.id)}
+                  className={`w-full p-4 rounded-xl border-2 ${
+                    selectedBankerId === player.id
+                      ? 'border-emerald-500 bg-emerald-50'
+                      : 'border-gray-200 hover:border-emerald-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="text-left">
+                        <div className="font-semibold">{player.displayName}</div>
+                        <div className="text-sm text-gray-600">Handicap: {player.handicap}</div>
+                      </div>
+                    </div>
+                    {selectedBankerId === player.id && (
+                      <div className="w-5 h-5 bg-emerald-600 rounded-full flex items-center justify-center">
+                        <div className="w-2 h-2 bg-white rounded-full" />
+                      </div>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowBankerSelection(false)}
+              disabled={!selectedBankerId}
+              className="w-full mt-6 bg-emerald-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Confirm Banker
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const banker = getBankerForHole(selectedBankerId);
+  const totalWagered = calculateTotalWagered();
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-green-100">
       {/* Header */}
@@ -739,10 +755,7 @@ export default function ScoringScreen({ game, course, onGameUpdate, onFinishGame
                           
                           <td className="p-1 text-center font-medium">
                             <div className="flex flex-col items-center">
-                              <div className={`text-sm ${
-                                relativeToPar < 0 ? 'text-blue-600' :
-                                relativeToPar > 0 ? 'text-red-600' : 'text-gray-600'
-                              }`}>
+                              <div className="text-sm">
                                 {totalScore}
                               </div>
                               <div className="text-xs text-gray-500">
@@ -763,3 +776,5 @@ export default function ScoringScreen({ game, course, onGameUpdate, onFinishGame
     </div>
   );
 }
+
+export default React.memo(ScoringScreen);

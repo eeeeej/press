@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Player, Course, Game } from './types';
+import { useState } from 'react';
+import { Player, Course, Game, GameStatus } from './types';
 import { courses } from './data/courses';
 import { shuffleArray } from './utils/gameLogic';
 import { useLocalStorage } from './hooks/useLocalStorage';
@@ -43,6 +43,12 @@ function App() {
   };
 
   const handleGameUpdate = (updatedGame: Game) => {
+    // Validate hole number - allow saving the final hole
+    if (selectedCourse && updatedGame.currentHole > selectedCourse.holes.length && updatedGame.status !== 'completed') {
+      console.error(`Invalid hole number: ${updatedGame.currentHole}. Course has ${selectedCourse.holes.length} holes.`);
+      return;
+    }
+    
     console.log('Updating game state:', {
       currentHole: updatedGame.currentHole,
       totalHoles: selectedCourse?.holes.length || 'N/A',
@@ -61,27 +67,49 @@ function App() {
     return gameWithUpdate;
   };
 
-  const handleFinishGame = () => {
-    console.log('handleFinishGame called, setting gameState to complete');
+  // Modified to be async and accept the final game state
+  const handleFinishGame = async (finalGameState?: Game) => {
+    console.log('handleFinishGame called with finalGameState:', finalGameState);
     
-    // Ensure we have the latest game state
+    // If we received a final game state, use it directly
+    if (finalGameState) {
+      console.log('Using provided final game state');
+      const completeGame = {
+        ...finalGameState,
+        status: 'completed' as const,
+        updatedAt: new Date().toISOString()
+      };
+      
+      // Set the game first, then change screens
+      setCurrentGame(completeGame);
+      console.log('Game set to completed state', completeGame);
+      
+      // Wait for state to update before changing screens
+      setTimeout(() => {
+        setGameState('complete');
+        console.log('Game screen changed to complete');
+      }, 100);
+      
+      return;
+    }
+    
+    // Fallback if no game state was provided
     setCurrentGame(prevGame => {
       if (!prevGame) return null;
       
-      console.log('Updating game status to completed');
-      return {
+      const updatedGame = {
         ...prevGame,
-        status: 'completed',
+        status: 'completed' as const,
         updatedAt: new Date().toISOString()
       };
+      
+      return updatedGame;
     });
     
-    // Use a small timeout to ensure state updates are processed
+    // Give state time to update
     setTimeout(() => {
-      console.log('Setting gameState to complete');
       setGameState('complete');
-      console.log('gameState set to complete');
-    }, 50);
+    }, 100);
   };
 
   const handleNewGame = () => {
@@ -128,6 +156,7 @@ function App() {
     console.log('Rendering ScoringScreen');
     return (
       <ScoringScreen
+        key={currentGame.id}  // Ensure new instance on game change
         game={currentGame}
         course={selectedCourse}
         onGameUpdate={handleGameUpdate}

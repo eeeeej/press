@@ -1,5 +1,6 @@
 import { Game, Course, GameSummary } from '../types';
-import { Trophy, TrendingUp, TrendingDown, RotateCcw, DollarSign } from 'lucide-react';
+import { Trophy, RotateCcw } from 'lucide-react';
+import React from 'react';
 
 interface GameSummaryProps {
   game: Game;
@@ -7,7 +8,7 @@ interface GameSummaryProps {
   onNewGame: () => void;
 }
 
-export default function GameSummaryComponent({ game, course, onNewGame }: GameSummaryProps) {
+function GameSummaryComponent({ game, course, onNewGame }: GameSummaryProps) {
   const calculateGameSummary = (): GameSummary[] => {
     const summaries: { [playerId: string]: GameSummary } = {};
 
@@ -81,8 +82,16 @@ export default function GameSummaryComponent({ game, course, onNewGame }: GameSu
   }
 
   const getHoleResults = (): HoleResultData[] => {
-    // Create an array for all 18 holes
-    return Array.from({ length: 18 }, (_, i) => {
+    // Get the actual count of holes that have been played
+    const holesPlayed = game.status === 'completed' 
+      ? course.holes.length  // If game is complete, use the course length
+      : game.currentHole - 1; // Otherwise use currentHole - 1 (since currentHole is 1-indexed)
+    
+    console.log('Game status:', game.status, 'holes played:', holesPlayed, 'current hole:', game.currentHole);
+    console.log('Hole scores available:', game.holeScores.map(hs => hs.holeNumber).join(', '));
+    
+    // Create an array for all played holes
+    return Array.from({ length: holesPlayed }, (_, i) => {
       const holeNumber = i + 1;
       const holeScore = game.holeScores.find(hs => hs.holeNumber === holeNumber);
       const holeResults: { [playerId: string]: HoleResult } = {};
@@ -266,3 +275,5 @@ export default function GameSummaryComponent({ game, course, onNewGame }: GameSu
     </div>
   );
 }
+
+export default React.memo(GameSummaryComponent);
