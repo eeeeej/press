@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Game, Course, GameSummary } from '../types';
 
 interface HoleResult {
@@ -21,6 +21,17 @@ interface ScoreCardProps {
 }
 
 const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], showHeader = true }) => {
+  // Reference to the scrollable container
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Effect to scroll to the right when component mounts
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      container.scrollLeft = container.scrollWidth;
+    }
+  }, []);
+
   // Sort players by their banker order from the game
   const sortedPlayers = [...game.players].sort((a, b) => {
     const aIndex = game.bankerOrder.indexOf(a.id);
@@ -110,12 +121,19 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
   })();
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs border-collapse">
+    <div className="overflow-x-auto" ref={scrollContainerRef}>
+      <table className="w-full text-xs border-collapse relative">
+        <colgroup>
+          <col style={{ width: '120px', minWidth: '120px' }} />
+          {holeResults.map((_, index) => (
+            <col key={`col-${index}`} style={{ width: '50px', minWidth: '50px' }} />
+          ))}
+          <col style={{ width: '80px', minWidth: '80px' }} />
+        </colgroup>
         {showHeader && (
           <thead>
             <tr className="bg-gray-800 text-white">
-              <th className="p-2 text-left w-32">Player (HCP)</th>
+              <th className="p-2 text-left sticky left-0 z-10 bg-gray-800 shadow-md">Player (HCP)</th>
               {/* Hole Numbers */}
               {holeResults.map(hole => (
                 <th key={hole.holeNumber} className="p-2 text-center border-l border-gray-600 w-12">
@@ -127,7 +145,7 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
             </tr>
             {/* Par Row */}
             <tr className="bg-gray-100 font-medium border-t-2 border-gray-300">
-              <td className="p-2 text-left">Par</td>
+              <td className="p-2 text-left sticky left-0 z-10 bg-gray-100 shadow-md">Par</td>
               {holeResults.map(hole => (
                 <td key={`par-${hole.holeNumber}`} className="p-1 text-center border-l border-gray-200">
                   {hole.par}
@@ -151,7 +169,7 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
             return (
               <tr key={player.id} className="border-b border-gray-200 hover:bg-gray-50">
                 {/* Player Name and Handicap */}
-                <td className="p-2 font-medium">
+                <td className="p-2 font-medium sticky left-0 z-10 bg-white shadow-md">
                   <div className="flex items-center">
                     {player.displayName}
                     <span className="ml-2 text-xs text-gray-500">({player.handicap})</span>
@@ -166,8 +184,8 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
                   const amount = hole.results[player.id]?.amount || 0;
                   
                   return (
-                    <td key={`${player.id}-${hole.holeNumber}`} className="p-1 border-l border-gray-100 relative h-16">
-                      <div className={`relative h-full flex flex-col ${isBanker ? 'bg-yellow-50' : ''} rounded`}>
+                    <td key={`${player.id}-${hole.holeNumber}`} className={`p-1 border-l border-gray-100 relative h-16 ${isBanker ? 'bg-yellow-50' : ''}`}>
+                      <div className="relative h-full flex flex-col rounded">
                         {/* Top row with amount */}
                         <div className="flex justify-end px-1 pt-1 min-h-[20px]">
                           {amount !== 0 && (
