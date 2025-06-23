@@ -192,7 +192,7 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
                             <div className={`text-[10px] font-medium ${
                               amount > 0 ? 'text-green-600' : 'text-red-600'
                             }`}>
-                              {amount > 0 ? '+' : ''}{amount}
+                              {amount > 0 ? '+$' : '-$'}{Math.abs(amount)}
                             </div>
                           )}
                         </div>
@@ -223,7 +223,7 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
                         <div className={`text-xs font-medium ${
                           totalWon > 0 ? 'text-green-600' : 'text-red-600'
                         }`}>
-                          {totalWon > 0 ? '+' : ''}{totalWon}
+                          {totalWon > 0 ? '+$' : '-$'}{Math.abs(totalWon)}
                         </div>
                       );
                     })()}

@@ -17,7 +17,6 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
   const [defaultBetAmount, setDefaultBetAmount] = useState<number>(1);
   const [playerBets, setPlayerBets] = useState<{ [playerId: string]: number }>({});
   const [bankerPressed, setBankerPressed] = useState<boolean>(false);
-  const [showBankerSelection, setShowBankerSelection] = useState(false);
   const [selectedBankerId, setSelectedBankerId] = useState<string>('');
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [activeTab, setActiveTab] = useState<'current' | 'summary'>('current');
@@ -77,7 +76,7 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
   // Check if manual banker selection is needed
   useEffect(() => {
     if (currentHole && !game.holeScores.find(hs => hs.holeNumber === game.currentHole) && !selectedBankerId) {
-      const { isManualSelection } = getNextBanker(
+      const { isManualSelection, bankerId } = getNextBanker(
         orderedPlayers,
         game.bankerOrder,
         game.currentHole,
@@ -85,10 +84,29 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
       );
       
       if (isManualSelection) {
-        setShowBankerSelection(true);
+        // Instead of showing the modal, show a toast notification
+        // instructing the user to long-press on a player to select banker
+        const element = document.createElement('div');
+        element.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-amber-50 border border-amber-200 rounded-lg p-3 shadow-lg z-50 flex items-center space-x-2 transition-opacity';
+        element.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-500"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"></path></svg>
+          <span class="text-sm font-medium text-amber-800">Long-press on a player icon to select banker</span>
+        `;
+        document.body.appendChild(element);
+        
+        // Remove the notification after a delay
+        setTimeout(() => {
+          element.classList.add('opacity-0');
+          setTimeout(() => {
+            document.body.removeChild(element);
+          }, 300);
+        }, 5000);
+      } else {
+        // If not manual selection, use the automatically determined banker
+        setSelectedBankerId(bankerId);
       }
     }
-  }, [currentHole, game.holeScores, orderedPlayers, selectedBankerId, game]);
+  }, [currentHole, game.holeScores, orderedPlayers, selectedBankerId, game, course.holes.length]);
   
   // Initialize scores for current hole
   useEffect(() => {
@@ -172,8 +190,58 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
 
   const handleLongPressStart = (playerId: string) => {
     const timer = setTimeout(() => {
+      // Set the selected banker ID
       setSelectedBankerId(playerId);
-      setShowBankerSelection(true);
+      
+      // Check if there's an existing hole score for the current hole
+      const existingHoleScore = game.holeScores.find(hs => hs.holeNumber === game.currentHole);
+      
+      // If there's an existing hole score, update it with the new banker ID
+      if (existingHoleScore) {
+        // Create an updated hole score with the new banker ID
+        const updatedHoleScore: HoleScore = {
+          ...existingHoleScore,
+          bankerId: playerId
+        };
+        
+        // Update the game state with the new banker ID
+        const updatedHoleScores = [
+          ...game.holeScores.filter(hs => hs.holeNumber !== game.currentHole),
+          updatedHoleScore
+        ];
+        
+        // Create the updated game object
+        const updatedGame: Game = {
+          ...game,
+          holeScores: updatedHoleScores,
+          updatedAt: new Date().toISOString()
+        };
+        
+        // Update the game state
+        onGameUpdate(updatedGame);
+      }
+      
+      // Add visual feedback when banker is selected
+      // Create a temporary element for visual feedback
+      const element = document.createElement('div');
+      element.className = 'fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50 transition-opacity';
+      element.innerHTML = `
+        <div class="bg-white rounded-lg p-4 shadow-lg transform scale-100 transition-transform">
+          <div class="flex items-center space-x-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-500"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"></path></svg>
+            <span class="font-medium">${orderedPlayers.find(p => p.id === playerId)?.displayName} is now the banker</span>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(element);
+      
+      // Remove the feedback after a short delay
+      setTimeout(() => {
+        element.classList.add('opacity-0');
+        setTimeout(() => {
+          document.body.removeChild(element);
+        }, 300);
+      }, 1500);
     }, 800); // 800ms long press
     setLongPressTimer(timer);
   };
@@ -271,7 +339,6 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
         }, 100);
       } else {
         console.log('Moving to next hole');
-        setShowBankerSelection(false);
         setSelectedBankerId('');
       }
     } catch (error) {
@@ -286,7 +353,6 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
         currentHole: game.currentHole - 1
       };
       onGameUpdate(updatedGame);
-      setShowBankerSelection(false);
       setSelectedBankerId('');
     }
   };
@@ -337,57 +403,6 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
 
   if (!currentHole) {
     return <div>Loading hole data...</div>;
-  }
-
-  if (showBankerSelection) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-green-100 p-4">
-        <div className="max-w-lg mx-auto">
-          <div className="bg-white rounded-2xl shadow-xl p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">
-              Select Banker for Hole {game.currentHole}
-            </h2>
-            <p className="text-gray-600 text-center mb-6">
-              Manual selection required for remaining holes
-            </p>
-            <div className="space-y-3">
-              {orderedPlayers.map(player => (
-                <button
-                  key={player.id}
-                  onClick={() => setSelectedBankerId(player.id)}
-                  className={`w-full p-4 rounded-xl border-2 ${
-                    selectedBankerId === player.id
-                      ? 'border-emerald-500 bg-emerald-50'
-                      : 'border-gray-200 hover:border-emerald-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="text-left">
-                        <div className="font-semibold">{player.displayName}</div>
-                        <div className="text-sm text-gray-600">Handicap: {player.handicap}</div>
-                      </div>
-                    </div>
-                    {selectedBankerId === player.id && (
-                      <div className="w-5 h-5 bg-emerald-600 rounded-full flex items-center justify-center">
-                        <div className="w-2 h-2 bg-white rounded-full" />
-                      </div>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setShowBankerSelection(false)}
-              disabled={!selectedBankerId}
-              className="w-full mt-6 bg-emerald-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Confirm Banker
-            </button>
-          </div>
-        </div>
-      </div>
-    );
   }
 
   const banker = getBankerForHole(selectedBankerId);
@@ -446,12 +461,6 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
                   }}
                   className="w-12 text-center bg-transparent text-sm font-semibold text-green-700 border-none outline-none"
                 />
-              </div>
-              
-              {/* Total Wagered */}
-              <div className="flex items-center space-x-1 bg-purple-50 px-3 py-2 rounded-lg">
-                <span className="text-xs text-purple-600 font-medium">Wagered:</span>
-                <span className="text-sm font-bold text-purple-700">${totalWagered}</span>
               </div>
               
               {/* Banker Info */}
@@ -525,7 +534,7 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
                         <div 
                           className={`w-10 h-10 rounded-full flex items-center justify-center cursor-pointer ${
                             isBanker ? 'bg-amber-100' : 'bg-emerald-100'
-                          }`}
+                          } relative group`}
                           onMouseDown={() => handleLongPressStart(player.id)}
                           onMouseUp={handleLongPressEnd}
                           onMouseLeave={handleLongPressEnd}
@@ -539,6 +548,8 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
                               {player.displayName.charAt(0)}
                             </span>
                           )}
+                          {/* Add a subtle hint for long-press */}
+                          <div className="absolute inset-0 rounded-full border-2 border-dashed border-amber-300 opacity-0 group-hover:opacity-50 transition-opacity"></div>
                         </div>
                         <div>
                           <div className="font-semibold text-gray-900 flex items-center space-x-1">
@@ -567,17 +578,26 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
                       
                       <div className="flex items-center space-x-2">
                         {/* Individual Bet Amount */}
-                        <div className="flex items-center space-x-1 bg-blue-50 px-2 py-1 rounded">
-                          <DollarSign className="w-3 h-3 text-blue-600" />
-                          <input
-                            type="number"
-                            min="1"
-                            max="100"
-                            value={playerBets[player.id] || defaultBetAmount}
-                            onChange={(e) => updatePlayerBet(player.id, parseInt(e.target.value) || 1)}
-                            className="w-8 text-center bg-transparent text-xs font-semibold text-blue-700 border-none outline-none"
-                          />
-                        </div>
+                        {isBanker ? (
+                          <div className="flex items-center space-x-1 bg-purple-50 px-2 py-1 rounded mr-2">
+                            <DollarSign className="w-3 h-3 text-purple-600" />
+                            <div className="w-auto text-center text-xs font-bold text-purple-700 pl-0.5">
+                              ${totalWagered}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-1 bg-blue-50 px-2 py-1 rounded">
+                            <DollarSign className="w-3 h-3 text-blue-600" />
+                            <input
+                              type="number"
+                              min="1"
+                              max="100"
+                              value={playerBets[player.id] || defaultBetAmount}
+                              onChange={(e) => updatePlayerBet(player.id, parseInt(e.target.value) || 1)}
+                              className="w-8 text-center bg-transparent text-xs font-semibold text-blue-700 border-none outline-none"
+                            />
+                          </div>
+                        )}
                         
                         {/* Press Button */}
                         <button

@@ -79,14 +79,14 @@ export function getNextBanker(
   currentHole: number,
   totalHoles: number
 ): { bankerId: string; isManualSelection: boolean } {
-  const holesRemaining = totalHoles - currentHole + 1;
-  const isManualSelection = holesRemaining < players.length;
+  // const holesRemaining = totalHoles - currentHole + 1;
+  // const isManualSelection = holesRemaining < players.length;
   
-  if (isManualSelection) {
-    // Return the first player for manual selection - UI will handle the selection
-    return { bankerId: players[0].id, isManualSelection: true };
-  }
+  // if (isManualSelection) {
+  //   // Return the first player for manual selection - UI will handle the selection
+  //   return { bankerId: players[0].id, isManualSelection: true };
+  // }
   
   const bankerIndex = (currentHole - 1) % bankerOrder.length;
-  return { bankerId: bankerOrder[bankerIndex], isManualSelection: false };
+  return { bankerId: bankerOrder[bankerIndex], isManualSelection: true };
 }
