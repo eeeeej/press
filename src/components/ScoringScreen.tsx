@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Player, Course, Game, HoleScore, PlayerScore } from '../types';
+import { Player, Course, Game, HoleScore, PlayerScore, GameSummary } from '../types';
 import { calculateHandicapDiff, calculateBankerMatches, getNextBanker } from '../utils/gameLogic';
 import { Minus, Plus, Crown, ArrowLeft, ArrowRight, DollarSign, Zap, LayoutGrid, List } from 'lucide-react';
+import ScoreCard from './ScoreCard';
 
 interface ScoringScreenProps {
   game: Game;
@@ -290,78 +291,49 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
     }
   };
 
-  // Calculate game summary data for the summary tab
+  // Calculate game summary statistics for the summary tab
   const gameSummary = useMemo(() => {
-    const summaries = game.players.map(player => {
-      let totalWinnings = 0;
-      let holesWon = 0;
-      let holesLost = 0;
-      let holesTied = 0;
+    const summaries: { [playerId: string]: GameSummary } = {};
 
-      game.holeScores.forEach(holeScore => {
-        holeScore.matches.forEach(match => {
-          if (match.bankerId === player.id) {
-            totalWinnings += match.result;
-            if (match.result > 0) holesWon++;
-            else if (match.result < 0) holesLost++;
-            else holesTied++;
-          } else if (match.playerId === player.id) {
-            totalWinnings -= match.result;
-            if (match.result < 0) holesWon++;
-            else if (match.result > 0) holesLost++;
-            else holesTied++;
-          }
-        });
-      });
-
-      return {
+    // Initialize summaries
+    game.players.forEach(player => {
+      summaries[player.id] = {
         playerId: player.id,
-        playerName: player.displayName,
-        totalWinnings,
-        holesWon,
-        holesLost,
-        holesTied
+        totalWinnings: 0,
+        holesWon: 0,
+        holesLost: 0
       };
     });
 
-    return summaries.sort((a, b) => b.totalWinnings - a.totalWinnings);
+    // Calculate results from each hole
+    game.holeScores.forEach(holeScore => {
+      holeScore.matches.forEach(match => {
+        if (match.result > 0) {
+          // Banker wins
+          summaries[match.bankerId].totalWinnings += match.result;
+          summaries[match.bankerId].holesWon += 1;
+          summaries[match.playerId].totalWinnings -= match.result;
+          summaries[match.playerId].holesLost += 1;
+        } else if (match.result < 0) {
+          // Player wins
+          summaries[match.playerId].totalWinnings += Math.abs(match.result);
+          summaries[match.playerId].holesWon += 1;
+          summaries[match.bankerId].totalWinnings -= Math.abs(match.result);
+          summaries[match.bankerId].holesLost += 1;
+        }
+      });
+    });
+
+    return Object.values(summaries);
   }, [game.players, game.holeScores]);
 
-  // Calculate hole results for the summary view
-  const holeResults = useMemo(() => {
-    return Array.from({ length: game.currentHole }, (_, i) => {
-      const holeNumber = i + 1;
-      const holeScore = game.holeScores.find(hs => hs.holeNumber === holeNumber);
-      const holeResults: { [playerId: string]: { score: number; amount: number } } = {};
-      
-      game.players.forEach(player => {
-        const playerScore = holeScore?.playerScores?.find(ps => ps.playerId === player.id);
-        holeResults[player.id] = {
-          score: playerScore?.score || 0,
-          amount: 0
-        };
-      });
-      
-      if (holeScore) {
-        holeScore.matches.forEach(match => {
-          if (match.result > 0) {
-            holeResults[match.bankerId].amount += match.result;
-            holeResults[match.playerId].amount -= match.result;
-          } else if (match.result < 0) {
-            holeResults[match.playerId].amount += Math.abs(match.result);
-            holeResults[match.bankerId].amount -= Math.abs(match.result);
-          }
-        });
-      }
-      
-      return {
-        holeNumber,
-        bankerId: holeScore?.bankerId || game.players[0]?.id || '',
-        par: course.holes.find(h => h.number === holeNumber)?.par || 0,
-        results: holeResults
-      };
-    });
-  }, [game.holeScores, game.players, course.holes]);
+  // Calculate player standings for the summary tab header
+  const calculatePlayerStandings = () => {
+    const summaries = [...gameSummary];
+    return summaries.sort((a, b) => b.totalWinnings - a.totalWinnings);
+  };
+
+  const playerStandings = useMemo(() => calculatePlayerStandings(), [gameSummary]);
 
   if (!currentHole) {
     return <div>Loading hole data...</div>;
@@ -533,243 +505,146 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
         <div className="max-w-lg mx-auto">
           {activeTab === 'current' ? (
             <div className="bg-white rounded-2xl shadow-xl p-4">
-            <div className="grid gap-3">
-              {orderedPlayers.map(player => {
-                const playerScore = currentScores.find(ps => ps.playerId === player.id);
-                const isBanker = player.id === banker.id;
-                const handicapDiff = calculateHandicapDiff(banker.handicap, player.handicap, currentHole.handicap);
-                const runningTotal = calculateRunningTotal(player.id);
-                
-                return (
-                  <div
-                    key={player.id}
-                    className={`flex items-center justify-between p-4 rounded-xl border-2 ${
-                      isBanker 
-                        ? 'border-amber-300 bg-amber-50' 
-                        : 'border-gray-200 bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div 
-                        className={`w-10 h-10 rounded-full flex items-center justify-center cursor-pointer ${
-                          isBanker ? 'bg-amber-100' : 'bg-emerald-100'
-                        }`}
-                        onMouseDown={() => handleLongPressStart(player.id)}
-                        onMouseUp={handleLongPressEnd}
-                        onMouseLeave={handleLongPressEnd}
-                        onTouchStart={() => handleLongPressStart(player.id)}
-                        onTouchEnd={handleLongPressEnd}
-                        title="Long press to select as banker"
-                      >
-                        {isBanker && <Crown className="w-5 h-5 text-amber-600" />}
-                        {!isBanker && (
-                          <span className="text-sm font-semibold text-emerald-600">
-                            {player.displayName.charAt(0)}
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-900 flex items-center space-x-1">
-                          <span>{player.displayName}</span>
-                          {handicapDiff !== 0 && (
-                            <sup className={`ml-1 px-1.5 py-0.5 rounded-full text-xs font-bold ${
-                              handicapDiff > 0 ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
-                            }`}>
-                              {handicapDiff > 0 ? '+' : ''}{handicapDiff}
-                            </sup>
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-2 text-xs">
-                          <span className="text-gray-600">HCP: {player.handicap}</span>
-                          {game.currentHole > 1 && (
-                            <span className={`font-semibold ${
-                              runningTotal > 0 ? 'text-green-600' : 
-                              runningTotal < 0 ? 'text-red-600' : 'text-gray-600'
-                            }`}>
-                              Total: {runningTotal > 0 ? '+' : ''}{runningTotal}
+              <div className="grid gap-3">
+                {orderedPlayers.map(player => {
+                  const playerScore = currentScores.find(ps => ps.playerId === player.id);
+                  const isBanker = player.id === banker.id;
+                  const handicapDiff = calculateHandicapDiff(banker.handicap, player.handicap, currentHole.handicap);
+                  const runningTotal = calculateRunningTotal(player.id);
+                  
+                  return (
+                    <div
+                      key={player.id}
+                      className={`flex items-center justify-between p-4 rounded-xl border-2 ${
+                        isBanker 
+                          ? 'border-amber-300 bg-amber-50' 
+                          : 'border-gray-200 bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div 
+                          className={`w-10 h-10 rounded-full flex items-center justify-center cursor-pointer ${
+                            isBanker ? 'bg-amber-100' : 'bg-emerald-100'
+                          }`}
+                          onMouseDown={() => handleLongPressStart(player.id)}
+                          onMouseUp={handleLongPressEnd}
+                          onMouseLeave={handleLongPressEnd}
+                          onTouchStart={() => handleLongPressStart(player.id)}
+                          onTouchEnd={handleLongPressEnd}
+                          title="Long press to select as banker"
+                        >
+                          {isBanker && <Crown className="w-5 h-5 text-amber-600" />}
+                          {!isBanker && (
+                            <span className="text-sm font-semibold text-emerald-600">
+                              {player.displayName.charAt(0)}
                             </span>
                           )}
                         </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      {/* Individual Bet Amount */}
-                      <div className="flex items-center space-x-1 bg-blue-50 px-2 py-1 rounded">
-                        <DollarSign className="w-3 h-3 text-blue-600" />
-                        <input
-                          type="number"
-                          min="1"
-                          max="100"
-                          value={playerBets[player.id] || defaultBetAmount}
-                          onChange={(e) => updatePlayerBet(player.id, parseInt(e.target.value) || 1)}
-                          className="w-8 text-center bg-transparent text-xs font-semibold text-blue-700 border-none outline-none"
-                        />
-                      </div>
-                      
-                      {/* Press Button */}
-                      <button
-                        onClick={() => isBanker ? setBankerPressed(!bankerPressed) : togglePress(player.id)}
-                        className={`p-2 rounded-lg transition-all ${
-                          (isBanker ? bankerPressed : playerScore?.pressed)
-                            ? 'bg-red-100 text-red-600 shadow-md' 
-                            : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                        }`}
-                        title={isBanker ? "Press All Bets" : "Press Bet"}
-                      >
-                        <Zap className="w-4 h-4" />
-                      </button>
-                      
-                      {/* Score Controls */}
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => updateScore(player.id, (playerScore?.score || currentHole.par) - 1)}
-                          className="w-8 h-8 bg-red-100 text-red-600 rounded-full flex items-center justify-center hover:bg-red-200 transition-colors"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </button>
-                        
-                        <div className="w-12 text-center">
-                          <div className="text-2xl font-bold text-gray-900">
-                            {playerScore?.score || currentHole.par}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {((playerScore?.score || currentHole.par) - currentHole.par) === 0 ? 'Par' :
-                             ((playerScore?.score || currentHole.par) - currentHole.par) > 0 ? 
-                             `+${(playerScore?.score || currentHole.par) - currentHole.par}` :
-                             `${(playerScore?.score || currentHole.par) - currentHole.par}`}
-                          </div>
-                        </div>
-                        
-                        <button
-                          onClick={() => updateScore(player.id, (playerScore?.score || currentHole.par) + 1)}
-                          className="w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center hover:bg-green-200 transition-colors"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <button
-              onClick={saveHoleAndContinue}
-              className="w-full mt-6 bg-emerald-600 text-white py-4 px-6 rounded-xl font-semibold text-lg hover:bg-emerald-700 transition-colors flex items-center justify-center space-x-2"
-            >
-              <span>{isLastHole ? 'Finish Game' : 'Next Hole'}</span>
-              {!isLastHole && <ArrowRight className="w-5 h-5" />}
-            </button>
-          </div>
-        ) : (
-            <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-              {/* Player Summary */}
-              <div className="p-4 border-b">
-                <h3 className="font-semibold text-gray-800 mb-2">Player Standings</h3>
-                <div className="space-y-2">
-                  {gameSummary.map((player, index) => (
-                    <div key={player.playerId} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          index === 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-200 text-gray-700'
-                        } font-semibold`}>
-                          {index + 1}
-                        </div>
                         <div>
-                          <div className="font-medium">{player.playerName}</div>
-                          <div className="text-xs text-gray-500">
-                            {player.holesWon}W / {player.holesLost}L / {player.holesTied}T
+                          <div className="font-semibold text-gray-900 flex items-center space-x-1">
+                            <span>{player.displayName}</span>
+                            {handicapDiff !== 0 && (
+                              <sup className={`ml-1 px-1.5 py-0.5 rounded-full text-xs font-bold ${
+                                handicapDiff > 0 ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                              }`}>
+                                {handicapDiff > 0 ? '+' : ''}{handicapDiff}
+                              </sup>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2 text-xs">
+                            <span className="text-gray-600">HCP: {player.handicap}</span>
+                            {game.currentHole > 1 && (
+                              <span className={`font-semibold ${
+                                runningTotal > 0 ? 'text-green-600' : 
+                                runningTotal < 0 ? 'text-red-600' : 'text-gray-600'
+                              }`}>
+                                Total: {runningTotal > 0 ? '+' : ''}{runningTotal}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
-                      <div className={`font-semibold ${
-                        player.totalWinnings > 0 ? 'text-green-600' : 
-                        player.totalWinnings < 0 ? 'text-red-600' : 'text-gray-600'
-                      }`}>
-                        {player.totalWinnings > 0 ? '+' : ''}{player.totalWinnings}
+                      
+                      <div className="flex items-center space-x-2">
+                        {/* Individual Bet Amount */}
+                        <div className="flex items-center space-x-1 bg-blue-50 px-2 py-1 rounded">
+                          <DollarSign className="w-3 h-3 text-blue-600" />
+                          <input
+                            type="number"
+                            min="1"
+                            max="100"
+                            value={playerBets[player.id] || defaultBetAmount}
+                            onChange={(e) => updatePlayerBet(player.id, parseInt(e.target.value) || 1)}
+                            className="w-8 text-center bg-transparent text-xs font-semibold text-blue-700 border-none outline-none"
+                          />
+                        </div>
+                        
+                        {/* Press Button */}
+                        <button
+                          onClick={() => isBanker ? setBankerPressed(!bankerPressed) : togglePress(player.id)}
+                          className={`p-2 rounded-lg transition-all ${
+                            (isBanker ? bankerPressed : playerScore?.pressed)
+                              ? 'bg-red-100 text-red-600 shadow-md' 
+                              : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                          }`}
+                          title={isBanker ? "Press All Bets" : "Press Bet"}
+                        >
+                          <Zap className="w-4 h-4" />
+                        </button>
+                        
+                        {/* Score Controls */}
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => updateScore(player.id, (playerScore?.score || currentHole.par) - 1)}
+                            className="w-8 h-8 bg-red-100 text-red-600 rounded-full flex items-center justify-center hover:bg-red-200 transition-colors"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                          
+                          <div className="w-12 text-center">
+                            <div className="text-2xl font-bold text-gray-900">
+                              {playerScore?.score || currentHole.par}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {((playerScore?.score || currentHole.par) - currentHole.par) === 0 ? 'Par' :
+                               ((playerScore?.score || currentHole.par) - currentHole.par) > 0 ? 
+                               `+${(playerScore?.score || currentHole.par) - currentHole.par}` :
+                               `${(playerScore?.score || currentHole.par) - currentHole.par}`}
+                            </div>
+                          </div>
+                          
+                          <button
+                            onClick={() => updateScore(player.id, (playerScore?.score || currentHole.par) + 1)}
+                            className="w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center hover:bg-green-200 transition-colors"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-              
-              {/* Scorecard */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-gray-50 border-b">
-                      <th className="p-2 text-left w-24">Player</th>
-                      {holeResults.map(hole => (
-                        <th key={hole.holeNumber} className="p-1 text-center text-xs w-10">
-                          <div>{hole.holeNumber}</div>
-                        </th>
-                      ))}
-                      <th className="p-2 text-center font-medium">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {game.players.map(player => {
-                      const totalScore = holeResults.reduce((sum, hole) => {
-                        return sum + (hole.results[player.id]?.score || 0);
-                      }, 0);
-                      const totalPar = holeResults.reduce((sum, hole) => sum + hole.par, 0);
-                      const relativeToPar = totalScore - totalPar;
-                      
-                      return (
-                        <tr key={player.id} className="border-b border-gray-100">
-                          <td className="p-2 text-sm font-medium">
-                            <div className="flex items-center">
-                              {player.displayName}
-                            </div>
-                          </td>
-                          
-                          {holeResults.map(hole => {
-                            const isBanker = hole.bankerId === player.id;
-                            const score = hole.results[player.id]?.score || 0;
-                            const amount = hole.results[player.id]?.amount || 0;
-                            const relativeToHolePar = score - hole.par;
-                            
-                            return (
-                              <td key={`${player.id}-${hole.holeNumber}`} className="p-0.5">
-                                <div className={`h-full flex flex-col items-center justify-center min-h-[40px] ${
-                                  isBanker ? 'bg-yellow-50' : ''
-                                }`}>
-                                  {amount !== 0 && (
-                                    <div className={`text-[10px] font-medium ${
-                                      amount > 0 ? 'text-green-600' : 'text-red-600'
-                                    }`}>
-                                      {amount > 0 ? '+' : ''}{amount}
-                                    </div>
-                                  )}
-                                  <div className={`text-sm ${
-                                    relativeToHolePar < 0 ? 'text-blue-600' :
-                                    relativeToHolePar > 0 ? 'text-red-600' : 'text-gray-600'
-                                  }`}>
-                                    {score}
-                                  </div>
-                                </div>
-                              </td>
-                            );
-                          })}
-                          
-                          <td className="p-1 text-center font-medium">
-                            <div className="flex flex-col items-center">
-                              <div className="text-sm">
-                                {totalScore}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {relativeToPar > 0 ? '+' : ''}{relativeToPar === 0 ? 'E' : relativeToPar}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+
+              <button
+                onClick={saveHoleAndContinue}
+                className="w-full mt-6 bg-emerald-600 text-white py-4 px-6 rounded-xl font-semibold text-lg hover:bg-emerald-700 transition-colors flex items-center justify-center space-x-2"
+              >
+                <span>{isLastHole ? 'Finish Game' : 'Next Hole'}</span>
+                {!isLastHole && <ArrowRight className="w-5 h-5" />}
+              </button>
             </div>
+          ) : (
+            <>
+              {/* ScoreCard Component */}
+              <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+                <ScoreCard 
+                  game={game} 
+                  course={course} 
+                  summaries={gameSummary}
+                />
+              </div>
+            </>
           )}
         </div>
       </div>
