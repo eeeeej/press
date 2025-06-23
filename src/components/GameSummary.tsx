@@ -126,64 +126,12 @@ export default function GameSummaryComponent({ game, course, onNewGame }: GameSu
         <div className="bg-white rounded-lg shadow-md p-4">
           {/* Course Info Header */}
           <div className="text-center mb-6 border-b pb-4">
-            <h1 className="text-2xl font-bold text-gray-800">GOLF SCORECARD</h1>
+            <h1 className="text-2xl font-bold text-gray-800">{course.name}</h1>
             <div className="flex justify-between text-sm text-gray-600 mt-2">
               <div>Holes: {game.holeScores.length} / {course.holes.length}</div>
               <div>Players: {game.players.length}</div>
               <div>Game Type: {game.gameType}</div>
             </div>
-          </div>
-
-          {/* Leaderboard */}
-          <div className="space-y-4 mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Final Results</h2>
-            {sortedSummaries.map((summary, index) => (
-              <div
-                key={summary.playerId}
-                className={`flex items-center justify-between p-4 rounded-xl border-2 ${
-                  index === 0 
-                    ? 'border-yellow-300 bg-yellow-50' 
-                    : 'border-gray-200 bg-gray-50'
-                }`}
-              >
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center justify-center w-10 h-10">
-                    {getTrophyIcon(index) || (
-                      <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                        <span className="text-sm font-semibold text-gray-600">{index + 1}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">
-                      {getPlayerName(summary.playerId)}
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      {summary.holesWon}W • {summary.holesLost}L
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className={`text-2xl font-bold flex items-center ${
-                    summary.totalWinnings > 0 
-                      ? 'text-green-600' 
-                      : summary.totalWinnings < 0 
-                        ? 'text-red-600' 
-                        : 'text-gray-600'
-                  }`}>
-                    <DollarSign className="w-5 h-5" />
-                    <span>{summary.totalWinnings > 0 ? '+' : ''}{summary.totalWinnings}</span>
-                  </div>
-                  <div className="flex items-center justify-end space-x-1 text-sm text-gray-500">
-                    {summary.totalWinnings > 0 ? (
-                      <TrendingUp className="w-4 h-4 text-green-500" />
-                    ) : summary.totalWinnings < 0 ? (
-                      <TrendingDown className="w-4 h-4 text-red-500" />
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
 
           {/* Scorecard */}
@@ -200,6 +148,18 @@ export default function GameSummaryComponent({ game, course, onNewGame }: GameSu
                     </th>
                   ))}
                   <th className="p-2 text-center border-l-2 border-gray-600 w-16">Total</th>
+                </tr>
+                {/* Par Row */}
+                <tr className="bg-gray-100 font-medium border-t-2 border-gray-300">
+                  <td className="p-2 text-left">Par</td>
+                  {holeResults.map(hole => (
+                    <td key={`par-${hole.holeNumber}`} className="p-1 text-center border-l border-gray-200">
+                      {hole.par}
+                    </td>
+                  ))}
+                  <td className="p-2 text-center border-l-2 border-gray-300">
+                    {holeResults.reduce((sum, hole) => sum + hole.par, 0)}
+                  </td>
                 </tr>
               </thead>
               <tbody>
@@ -290,51 +250,8 @@ export default function GameSummaryComponent({ game, course, onNewGame }: GameSu
                   );
                 })}
                 
-                {/* Par Row */}
-                <tr className="bg-gray-100 font-medium border-t-2 border-gray-300">
-                  <td className="p-2 text-left">Par</td>
-                  {holeResults.map(hole => (
-                    <td key={`par-${hole.holeNumber}`} className="p-1 text-center border-l border-gray-200">
-                      {hole.par}
-                    </td>
-                  ))}
-                  <td className="p-2 text-center border-l-2 border-gray-300">
-                    {holeResults.reduce((sum, hole) => sum + hole.par, 0)}
-                  </td>
-                </tr>
               </tbody>
             </table>
-          </div>
-
-          {/* Summary Section */}
-          <div className="mt-8">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Final Results</h3>
-            <div className="space-y-3">
-              {sortedSummaries.map((summary, index) => (
-                <div 
-                  key={summary.playerId}
-                  className="flex justify-between items-center p-3 border rounded-lg"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                      <span className="font-medium">{index + 1}</span>
-                    </div>
-                    <div>
-                      <div className="font-medium">{getPlayerName(summary.playerId)}</div>
-                      <div className="text-sm text-gray-500">
-                        {summary.holesWon}W • {summary.holesLost}L • {totalMatches - summary.holesWon - summary.holesLost}T
-                      </div>
-                    </div>
-                  </div>
-                  <div className={`text-lg font-bold ${
-                    summary.totalWinnings > 0 ? 'text-green-600' : 
-                    summary.totalWinnings < 0 ? 'text-red-600' : 'text-gray-600'
-                  }`}>
-                    {summary.totalWinnings > 0 ? '+' : ''}{summary.totalWinnings}
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
 
           <button
