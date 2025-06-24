@@ -22,7 +22,17 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
   const [activeTab, setActiveTab] = useState<'current' | 'summary'>('current');
 
   // Derived state and variables
-  const currentHole = course.holes.find(h => h.number === game.currentHole);
+  const currentHole = useMemo(() => {
+    // If we're returning from the summary screen and can't find the current hole,
+    // default to the last hole in the course
+    const hole = course.holes.find(h => h.number === game.currentHole);
+    if (!hole && game.status === 'completed') {
+      // If game is completed but no current hole found, use the last hole
+      return course.holes[course.holes.length - 1];
+    }
+    return hole;
+  }, [course.holes, game.currentHole, game.status]);
+  
   const isLastHole = game.currentHole === course.holes.length;
   
   // Arrange players in banker order
@@ -125,12 +135,13 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
       setDefaultBetAmount(existingHoleScore.betAmount);
       setBankerPressed(existingHoleScore.bankerPressed);
       
-      // Set individual player bets from existing data
+      // Initialize player bets from initialWagers if available, otherwise use betAmount
       const bets: { [playerId: string]: number } = {};
       orderedPlayers.forEach(player => {
-        const match = existingHoleScore.matches.find(m => m.playerId === player.id || m.bankerId === player.id);
-        bets[player.id] = match?.betAmount || existingHoleScore.betAmount;
+        // Use the saved initial wager if it exists, otherwise fall back to the hole's betAmount
+        bets[player.id] = existingHoleScore.initialWagers?.[player.id] ?? existingHoleScore.betAmount;
       });
+      console.log('Initialized player bets from initialWagers:', bets);
       setPlayerBets(bets);
     } else {
       // Get the previous hole's bet amount or use 1 as default
@@ -279,6 +290,12 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
     // Get the bet amount to use (either from state or previous hole)
     const betAmountToUse = defaultBetAmount;
     
+    // Store initial wagers for each player
+    const initialWagers: { [playerId: string]: number } = {};
+    orderedPlayers.forEach(player => {
+      initialWagers[player.id] = playerBets[player.id] || betAmountToUse;
+    });
+    
     // Create modified scores with individual bet amounts for calculation
     const scoresWithBets = currentScores.map(score => ({
       ...score,
@@ -296,6 +313,7 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
       return;
     }
     
+    // Clear any existing matches for this hole to prevent accumulation
     const matches = calculateBankerMatches(currentHole, banker, orderedPlayers, scoresWithBets, betAmountToUse, bankerPressed);
 
     // Create the hole score for the current hole
@@ -305,11 +323,16 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
       playerScores: currentScores,
       matches,
       betAmount: betAmountToUse,
+      initialWagers, // Store the initial wagers
       bankerPressed: bankerPressed
     };
+    
+    console.log('Saving hole with initial wagers:', initialWagers);
 
-    // Update the hole scores array with the new score
-    const updatedHoleScores = [...game.holeScores.filter(hs => hs.holeNumber !== game.currentHole), holeScore];
+    // Make sure we completely remove any existing hole score for this hole
+    // This prevents accumulation of matches when editing a hole multiple times
+    const filteredHoleScores = game.holeScores.filter(hs => hs.holeNumber !== game.currentHole);
+    const updatedHoleScores = [...filteredHoleScores, holeScore];
     
     // Create the updated game object
     const updatedGame: Game = {
@@ -503,7 +526,7 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
               }`}
             >
               <List className="w-4 h-4" />
-              <span>Game Summary</span>
+              <span>Scorecard</span>
             </button>
           </div>
         </div>

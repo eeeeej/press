@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Player, Course, Game, GameStatus } from './types';
+import { Player, Course, Game } from './types';
 import { courses } from './data/courses';
 import { shuffleArray } from './utils/gameLogic';
 import { useLocalStorage } from './hooks/useLocalStorage';
@@ -126,6 +126,40 @@ function App() {
     setGameState('course');
   };
 
+  const handleBackToPlaying = () => {
+    // Reset the game status to in_progress when going back from summary
+    if (currentGame && currentGame.status === 'completed' && selectedCourse) {
+      const lastHoleNumber = selectedCourse.holes.length;
+      
+      // Create a completely fresh copy of the game state to avoid any reference issues
+      const cleanGame = JSON.parse(JSON.stringify(currentGame));
+      
+      // Ensure we're not duplicating any hole scores by creating a Map keyed by hole number
+      // This prevents any potential for double-counting or accumulation of wager amounts
+      const uniqueHoleScoresMap = new Map();
+      
+      // Process each hole score to ensure we only have one entry per hole
+      cleanGame.holeScores.forEach((hs: any) => {
+        uniqueHoleScoresMap.set(hs.holeNumber, hs);
+      });
+      
+      // Convert the Map back to an array
+      const uniqueHoleScores = Array.from(uniqueHoleScoresMap.values());
+      
+      const updatedGame = {
+        ...cleanGame,
+        status: 'in_progress' as const,
+        currentHole: lastHoleNumber,
+        holeScores: uniqueHoleScores,
+        updatedAt: new Date().toISOString()
+      };
+      
+      console.log('Navigating back to playing with unique hole scores:', uniqueHoleScores.length);
+      setCurrentGame(updatedGame);
+    }
+    setGameState('playing');
+  };
+
   console.log('Rendering App with gameState:', gameState);
 
   if (gameState === 'players') {
@@ -173,6 +207,7 @@ function App() {
         game={currentGame}
         course={selectedCourse}
         onNewGame={handleNewGame}
+        onBack={handleBackToPlaying}
       />
     );
   }

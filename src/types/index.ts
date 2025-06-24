@@ -31,6 +31,7 @@ export interface HoleScore {
   playerScores: PlayerScore[];
   matches: BankerMatch[];
   betAmount: number;
+  initialWagers: { [playerId: string]: number };  // Track initial wager per player
   bankerPressed: boolean;
 }
 

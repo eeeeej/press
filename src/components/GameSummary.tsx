@@ -1,5 +1,5 @@
 import { Game, Course, GameSummary } from '../types';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, ArrowLeft } from 'lucide-react';
 import React from 'react';
 import ScoreCard from './ScoreCard';
 
@@ -7,9 +7,10 @@ interface GameSummaryProps {
   game: Game;
   course: Course;
   onNewGame: () => void;
+  onBack?: () => void;
 }
 
-function GameSummaryComponent({ game, course, onNewGame }: GameSummaryProps) {
+function GameSummaryComponent({ game, course, onNewGame, onBack }: GameSummaryProps) {
   const calculateGameSummary = (): GameSummary[] => {
     const summaries: { [playerId: string]: GameSummary } = {};
 
@@ -71,13 +72,24 @@ function GameSummaryComponent({ game, course, onNewGame }: GameSummaryProps) {
             />
           </div>
 
-          <button
-            onClick={onNewGame}
-            className="w-full bg-emerald-600 text-white py-4 px-6 rounded-xl font-semibold text-lg hover:bg-emerald-700 transition-colors flex items-center justify-center space-x-2"
-          >
-            <RotateCcw className="w-5 h-5" />
-            <span>New Game</span>
-          </button>
+          <div className="flex gap-4">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="flex-1 bg-gray-500 text-white py-4 px-6 rounded-xl font-semibold text-lg hover:bg-gray-600 transition-colors flex items-center justify-center space-x-2"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                <span>Back</span>
+              </button>
+            )}
+            <button
+              onClick={onNewGame}
+              className="flex-1 bg-emerald-600 text-white py-4 px-6 rounded-xl font-semibold text-lg hover:bg-emerald-700 transition-colors flex items-center justify-center space-x-2"
+            >
+              <RotateCcw className="w-5 h-5" />
+              <span>New Game</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
