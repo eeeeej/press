@@ -580,7 +580,6 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
                         {/* Individual Bet Amount */}
                         {isBanker ? (
                           <div className="flex items-center space-x-1 bg-purple-50 px-2 py-1 rounded mr-2">
-                            <DollarSign className="w-3 h-3 text-purple-600" />
                             <div className="w-auto text-center text-xs font-bold text-purple-700 pl-0.5">
                               ${totalWagered}
                             </div>
