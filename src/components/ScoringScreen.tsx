@@ -94,23 +94,7 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
       );
       
       if (isManualSelection) {
-        // Instead of showing the modal, show a toast notification
-        // instructing the user to long-press on a player to select banker
-        const element = document.createElement('div');
-        element.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-amber-50 border border-amber-200 rounded-lg p-3 shadow-lg z-50 flex items-center space-x-2 transition-opacity';
-        element.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-500"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"></path></svg>
-          <span class="text-sm font-medium text-amber-800">Long-press on a player icon to select banker</span>
-        `;
-        document.body.appendChild(element);
-        
-        // Remove the notification after a delay
-        setTimeout(() => {
-          element.classList.add('opacity-0');
-          setTimeout(() => {
-            document.body.removeChild(element);
-          }, 300);
-        }, 5000);
+        setSelectedBankerId(bankerId);
       } else {
         // If not manual selection, use the automatically determined banker
         setSelectedBankerId(bankerId);
