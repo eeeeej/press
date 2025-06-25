@@ -416,14 +416,6 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
     return Object.values(summaries);
   }, [game.players, game.holeScores]);
 
-  // Calculate player standings for the summary tab header
-  const calculatePlayerStandings = () => {
-    const summaries = [...gameSummary];
-    return summaries.sort((a, b) => b.totalWinnings - a.totalWinnings);
-  };
-
-  const playerStandings = useMemo(() => calculatePlayerStandings(), [gameSummary]);
-
   if (!currentHole) {
     return <div>Loading hole data...</div>;
   }
