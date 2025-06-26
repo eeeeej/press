@@ -5,6 +5,7 @@ import path from 'path';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  base: '/',  // This works for Netlify
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
@@ -20,6 +21,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    sourcemap: true,
     emptyOutDir: true,
   },
 });
