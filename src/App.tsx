@@ -1,20 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Player, Course, Game } from './types';
 import { courses } from './data/courses';
 import { shuffleArray } from './utils/gameLogic';
 import { useLocalStorage } from './hooks/useLocalStorage';
+import { useGamePersistence } from './hooks/useGamePersistence';
 import PlayerManagement from './components/PlayerManagement';
 import CourseSelection from './components/CourseSelection';
 import ScoringScreen from './components/ScoringScreen';
 import GameSummary from './components/GameSummary';
+import SavedGames from './components/SavedGames';
 
-type GameState = 'players' | 'course' | 'playing' | 'complete';
+type GameState = 'players' | 'course' | 'playing' | 'complete' | 'saved-games';
 
 function App() {
   const [gameState, setGameState] = useState<GameState>('players');
   const [players, setPlayers] = useLocalStorage<Player[]>('banker-players', []);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [currentGame, setCurrentGame] = useLocalStorage<Game | null>('banker-current-game', null);
+  const { saveGame, loadGame, deleteGame } = useGamePersistence();
+
+  // Auto-save game whenever it changes
+  useEffect(() => {
+    if (currentGame && selectedCourse) {
+      saveGame(currentGame, selectedCourse.name);
+    }
+  }, [currentGame, selectedCourse, saveGame]);
 
   const handlePlayersNext = () => {
     setGameState('course');
@@ -160,6 +170,27 @@ function App() {
     setGameState('playing');
   };
 
+  const handleResumeGame = (gameId: string) => {
+    const savedGame = loadGame(gameId);
+    if (savedGame) {
+      // Find the course
+      const course = courses.find(c => c.id === savedGame.courseId);
+      if (course) {
+        setSelectedCourse(course);
+        setCurrentGame(savedGame);
+        setGameState(savedGame.status === 'completed' ? 'complete' : 'playing');
+      }
+    }
+  };
+
+  const handleDeleteGame = (gameId: string) => {
+    deleteGame(gameId);
+  };
+
+  const handleShowSavedGames = () => {
+    setGameState('saved-games');
+  };
+
   console.log('Rendering App with gameState:', gameState);
 
   if (gameState === 'players') {
@@ -169,6 +200,7 @@ function App() {
         players={players}
         onPlayersChange={setPlayers}
         onNext={handlePlayersNext}
+        onShowSavedGames={handleShowSavedGames}
       />
     );
   }
@@ -208,6 +240,18 @@ function App() {
         course={selectedCourse}
         onNewGame={handleNewGame}
         onBack={handleBackToPlaying}
+      />
+    );
+  }
+
+  if (gameState === 'saved-games') {
+    console.log('Rendering SavedGames');
+    return (
+      <SavedGames
+        onResumeGame={handleResumeGame}
+        onDeleteGame={handleDeleteGame}
+        onBack={handleNewGame}
+        onNewGame={handleNewGame}
       />
     );
   }

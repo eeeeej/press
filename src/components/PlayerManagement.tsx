@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { Player } from '../types';
-import { UserPlus, Edit3, Trash2, User } from 'lucide-react';
+import { UserPlus, Edit3, Trash2, User, Clock } from 'lucide-react';
 
 interface PlayerManagementProps {
   players: Player[];
   onPlayersChange: (players: Player[]) => void;
   onNext: () => void;
+  onShowSavedGames?: () => void;
 }
 
-export default function PlayerManagement({ players, onPlayersChange, onNext }: PlayerManagementProps) {
+export default function PlayerManagement({ players, onPlayersChange, onNext, onShowSavedGames }: PlayerManagementProps) {
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -191,7 +192,16 @@ export default function PlayerManagement({ players, onPlayersChange, onNext }: P
           )}
 
           {/* Continue Button */}
-          <div className="mt-8 pt-6 border-t">
+          <div className="mt-8 pt-6 border-t space-y-3">
+            {onShowSavedGames && (
+              <button
+                onClick={onShowSavedGames}
+                className="w-full border-2 border-gray-300 text-gray-700 py-3 px-6 rounded-xl font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center space-x-2"
+              >
+                <Clock className="w-5 h-5" />
+                <span>View Saved Games</span>
+              </button>
+            )}
             <button
               onClick={onNext}
               disabled={!canProceed}
