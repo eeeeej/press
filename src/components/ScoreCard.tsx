@@ -1,5 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Game, Course, GameSummary } from '../types';
+import html2canvas from 'html2canvas';
+import { Download, Share2 } from 'lucide-react';
 
 interface HoleResult {
   score: number;
@@ -23,6 +25,8 @@ interface ScoreCardProps {
 const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], showHeader = true }) => {
   // Reference to the scrollable container
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Reference to the scorecard for image capture
+  const scorecardRef = useRef<HTMLDivElement>(null);
   
   // Effect to scroll to the right when component mounts
   useEffect(() => {
@@ -31,6 +35,113 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
       container.scrollLeft = container.scrollWidth;
     }
   }, []);
+
+  const handleDownloadImage = async () => {
+    if (!scorecardRef.current || !scrollContainerRef.current) return;
+
+    try {
+      // Get the full scrollable width
+      const element = scorecardRef.current;
+      const container = scrollContainerRef.current;
+      const scrollWidth = element.scrollWidth;
+      const scrollHeight = element.scrollHeight;
+      
+      // Save current scroll position
+      const originalScrollLeft = container.scrollLeft;
+      
+      // Reset scroll to leftmost position
+      container.scrollLeft = 0;
+      
+      // Temporarily set width to full scroll width for capture
+      const originalWidth = element.style.width;
+      const originalOverflow = element.style.overflow;
+      element.style.width = `${scrollWidth}px`;
+      element.style.overflow = 'visible';
+
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#ffffff',
+        scale: 1, // Use scale 1 to keep image size manageable
+        logging: false,
+        width: scrollWidth,
+        height: scrollHeight,
+        windowWidth: scrollWidth,
+        windowHeight: scrollHeight,
+      });
+
+      // Restore original styles and scroll position
+      element.style.width = originalWidth;
+      element.style.overflow = originalOverflow;
+      container.scrollLeft = originalScrollLeft;
+
+      const link = document.createElement('a');
+      link.download = `scorecard-${course.name}-${new Date().toISOString().split('T')[0]}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (error) {
+      console.error('Error generating image:', error);
+      alert('Failed to generate image. Please try again.');
+    }
+  };
+
+  const handleShareImage = async () => {
+    if (!scorecardRef.current || !scrollContainerRef.current) return;
+
+    try {
+      // Get the full scrollable width
+      const element = scorecardRef.current;
+      const container = scrollContainerRef.current;
+      const scrollWidth = element.scrollWidth;
+      const scrollHeight = element.scrollHeight;
+      
+      // Save current scroll position
+      const originalScrollLeft = container.scrollLeft;
+      
+      // Reset scroll to leftmost position
+      container.scrollLeft = 0;
+      
+      // Temporarily set width to full scroll width for capture
+      const originalWidth = element.style.width;
+      const originalOverflow = element.style.overflow;
+      element.style.width = `${scrollWidth}px`;
+      element.style.overflow = 'visible';
+
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#ffffff',
+        scale: 1, // Use scale 1 to keep image size manageable
+        logging: false,
+        width: scrollWidth,
+        height: scrollHeight,
+        windowWidth: scrollWidth,
+        windowHeight: scrollHeight,
+      });
+
+      // Restore original styles and scroll position
+      element.style.width = originalWidth;
+      element.style.overflow = originalOverflow;
+      container.scrollLeft = originalScrollLeft;
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+
+        if (navigator.share && navigator.canShare({ files: [new File([blob], 'scorecard.png', { type: 'image/png' })] })) {
+          const file = new File([blob], 'scorecard.png', { type: 'image/png' });
+          await navigator.share({
+            files: [file],
+            title: `${course.name} Scorecard`,
+            text: `Scorecard for ${course.name}`,
+          });
+        } else {
+          // Fallback to download if share not supported
+          handleDownloadImage();
+        }
+      });
+    } catch (error) {
+      console.error('Error sharing image:', error);
+      if (error instanceof Error && error.name !== 'AbortError') {
+        alert('Failed to share image. Please try downloading instead.');
+      }
+    }
+  };
 
   // Sort players by their banker order from the game
   const sortedPlayers = [...game.players].sort((a, b) => {
@@ -121,8 +232,30 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
   })();
 
   return (
-    <div className="overflow-x-auto" ref={scrollContainerRef}>
-      <table className="w-full text-xs border-collapse relative">
+    <div>
+      {/* Share/Download Buttons */}
+      <div className="flex justify-end space-x-2 mb-3">
+        <button
+          onClick={handleDownloadImage}
+          className="flex items-center space-x-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+          title="Download as image"
+        >
+          <Download className="w-4 h-4" />
+          <span>Download</span>
+        </button>
+        <button
+          onClick={handleShareImage}
+          className="flex items-center space-x-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm"
+          title="Share scorecard"
+        >
+          <Share2 className="w-4 h-4" />
+          <span>Share</span>
+        </button>
+      </div>
+      
+      <div className="overflow-x-auto" ref={scrollContainerRef}>
+        <div ref={scorecardRef}>
+          <table className="w-full text-xs border-collapse relative">
         <colgroup>
           <col style={{ width: '120px', minWidth: '120px' }} />
           {holeResults.map((_, index) => (
@@ -246,6 +379,8 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
           })}
         </tbody>
       </table>
+        </div>
+      </div>
     </div>
   );
 };
