@@ -8,6 +8,7 @@ interface CourseSelectionProps {
   onCourseSelect: (course: Course) => void;
   onNext: () => void;
   onBack: () => void;
+  playMoreMode?: boolean;
 }
 
 export default function CourseSelection({
@@ -15,24 +16,30 @@ export default function CourseSelection({
   selectedCourse,
   onCourseSelect,
   onNext,
-  onBack
+  onBack,
+  playMoreMode = false
 }: CourseSelectionProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-green-100 p-4">
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2 text-center">
-            Select Course
+            {playMoreMode ? 'Add More Holes' : 'Select Course'}
           </h1>
           <p className="text-gray-600 text-center mb-8">
-            Choose your golf course for today's round
+            {playMoreMode ? 'Choose a course to add more holes to your current game' : 'Choose your golf course for today\'s round'}
           </p>
 
           <div className="space-y-4 mb-8">
             {courses.map((course) => (
               <div
                 key={course.id}
-                onClick={() => onCourseSelect(course)}
+                onClick={() => {
+                  onCourseSelect(course);
+                  if (playMoreMode) {
+                    onNext();
+                  }
+                }}
                 className={`cursor-pointer p-6 rounded-xl border-2 transition-all hover:shadow-lg ${
                   selectedCourse?.id === course.id
                     ? 'border-emerald-500 bg-emerald-50'

@@ -10,6 +10,8 @@ export interface Hole {
   par: number;
   yards: number;
   handicap: number;
+  originalCourseName?: string;
+  originalCourseId?: number;
 }
 
 export interface Course {

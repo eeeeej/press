@@ -10,7 +10,7 @@ import ScoringScreen from './components/ScoringScreen';
 import GameSummary from './components/GameSummary';
 import SavedGames from './components/SavedGames';
 
-type GameState = 'players' | 'course' | 'playing' | 'complete' | 'saved-games';
+type GameState = 'players' | 'course' | 'playing' | 'complete' | 'saved-games' | 'play-more-course';
 
 function App() {
   const [gameState, setGameState] = useState<GameState>('players');
@@ -191,6 +191,46 @@ function App() {
     setGameState('saved-games');
   };
 
+  const handlePlayMore = () => {
+    setGameState('play-more-course');
+  };
+
+  const handlePlayMoreCourseSelect = (additionalCourse: Course) => {
+    if (!selectedCourse || !currentGame) return;
+
+    // Merge the holes from the additional course, preserving original course info
+    const mergedCourse: Course = {
+      ...selectedCourse,
+      holes: [
+        ...selectedCourse.holes.map(hole => ({
+          ...hole,
+          // Preserve existing originalCourseName if it exists, otherwise set it
+          originalCourseName: hole.originalCourseName || selectedCourse.name,
+          originalCourseId: hole.originalCourseId || selectedCourse.id
+        })),
+        ...additionalCourse.holes.map(hole => ({
+          ...hole,
+          number: selectedCourse.holes.length + hole.number,
+          originalCourseName: additionalCourse.name,
+          originalCourseId: additionalCourse.id
+        }))
+      ],
+      name: `${selectedCourse.name} + ${additionalCourse.name}`
+    };
+
+    // Update the game to continue from the first hole of the new course
+    const updatedGame: Game = {
+      ...currentGame,
+      status: 'in_progress' as const,
+      currentHole: selectedCourse.holes.length + 1,
+      updatedAt: new Date().toISOString()
+    };
+
+    setSelectedCourse(mergedCourse);
+    setCurrentGame(updatedGame);
+    setGameState('playing');
+  };
+
   console.log('Rendering App with gameState:', gameState);
 
   if (gameState === 'players') {
@@ -239,6 +279,7 @@ function App() {
         game={currentGame}
         course={selectedCourse}
         onNewGame={handleNewGame}
+        onPlayMore={handlePlayMore}
         onBack={handleBackToPlaying}
       />
     );
@@ -252,6 +293,20 @@ function App() {
         onDeleteGame={handleDeleteGame}
         onBack={handleNewGame}
         onNewGame={handleNewGame}
+      />
+    );
+  }
+
+  if (gameState === 'play-more-course') {
+    console.log('Rendering CourseSelection for Play More');
+    return (
+      <CourseSelection
+        courses={courses}
+        selectedCourse={null}
+        onCourseSelect={handlePlayMoreCourseSelect}
+        onNext={() => {}}
+        onBack={() => setGameState('complete')}
+        playMoreMode={true}
       />
     );
   }

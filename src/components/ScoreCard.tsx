@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Game, Course, GameSummary } from '../types';
 import html2canvas from 'html2canvas';
-import { Download, Share2 } from 'lucide-react';
+import { Download, Share2, Zap } from 'lucide-react';
 
 interface HoleResult {
   score: number;
@@ -288,6 +288,78 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
         </colgroup>
         {showHeader && (
           <thead>
+            {/* Course Name Row */}
+            <tr className="bg-gray-700 text-white">
+              <th className="p-2 text-left sticky left-0 z-10 bg-gray-700 shadow-md"></th>
+              {(() => {
+                const cells: JSX.Element[] = [];
+                let currentCourseName: string | null = null;
+                let courseStartIndex = 0;
+
+                holeResults.forEach((item, index) => {
+                  if ('isNineHoleTotal' in item) {
+                    // Close any open course span
+                    if (currentCourseName !== null) {
+                      cells.push(
+                        <th 
+                          key={`course-${currentCourseName}`}
+                          colSpan={index - courseStartIndex}
+                          className="p-2 text-center border-l border-gray-600"
+                        >
+                          {currentCourseName}
+                        </th>
+                      );
+                      currentCourseName = null;
+                    }
+                    // Add empty cell for 9-hole total with different color
+                    cells.push(
+                      <th 
+                        key={`total-${index}`}
+                        className="p-2 text-center border-l-2 border-gray-600 w-16 bg-gray-600"
+                      >
+                      </th>
+                    );
+                  } else {
+                    const hole = course.holes.find(h => h.number === item.holeNumber);
+                    const holeCourseName = hole?.originalCourseName || course.name;
+                    
+                    if (currentCourseName === null) {
+                      currentCourseName = holeCourseName;
+                      courseStartIndex = index;
+                    } else if (currentCourseName !== holeCourseName) {
+                      // Course changed, close previous span
+                      cells.push(
+                        <th 
+                          key={`course-${currentCourseName}`}
+                          colSpan={index - courseStartIndex}
+                          className="p-2 text-center border-l border-gray-600"
+                        >
+                          {currentCourseName}
+                        </th>
+                      );
+                      currentCourseName = holeCourseName;
+                      courseStartIndex = index;
+                    }
+                  }
+                });
+
+                // Close any remaining course span
+                if (currentCourseName !== null) {
+                  cells.push(
+                    <th 
+                      key={`course-${currentCourseName}`}
+                      colSpan={holeResults.length - courseStartIndex}
+                      className="p-2 text-center border-l border-gray-600"
+                    >
+                      {currentCourseName}
+                    </th>
+                  );
+                }
+
+                return cells;
+              })()}
+              <th className="p-2 text-center border-l-2 border-gray-600 w-16"></th>
+            </tr>
             <tr className="bg-gray-800 text-white">
               <th className="p-2 text-left sticky left-0 z-10 bg-gray-800 shadow-md">Player (HCP)</th>
               {/* Hole Numbers */}
@@ -301,7 +373,7 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
                 return (
                   <th key={item.holeNumber} className="p-2 text-center border-l border-gray-600 w-12">
                     <div>{item.holeNumber}</div>
-                    <div className="text-xs text-gray-300">{item.par}</div>
+                    <div className="text-xs text-gray-300">{course.holes.find(h => h.number === item.holeNumber)?.handicap || ''}</div>
                   </th>
                 );
               })}
@@ -387,9 +459,20 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
                   const relativeToHolePar = score - item.par;
                   const amount = item.results[player.id]?.amount || 0;
                   
+                  // Check if player pressed on this hole
+                  const holeScore = game.holeScores.find(hs => hs.holeNumber === item.holeNumber);
+                  const playerScore = holeScore?.playerScores.find(ps => ps.playerId === player.id);
+                  const isPressed = playerScore?.pressed || false;
+                  
                   return (
                     <td key={`${player.id}-${item.holeNumber}`} className={`p-1 border-l border-gray-100 relative h-16 ${isBanker ? 'bg-yellow-50' : ''}`}>
                       <div className="relative h-full flex flex-col rounded">
+                        {/* Lightning icon if pressed */}
+                        {isPressed && (
+                          <div className="absolute top-0 right-0 p-0.5">
+                            <Zap className="w-3 h-3 text-yellow-500" />
+                          </div>
+                        )}
                         {/* Top row with amount */}
                         <div className="flex justify-end px-1 pt-1 min-h-[20px]">
                           {amount !== 0 && (

@@ -1,5 +1,5 @@
 import { Game, Course, GameSummary } from '../types';
-import { RotateCcw, ArrowLeft } from 'lucide-react';
+import { RotateCcw, ArrowLeft, Plus } from 'lucide-react';
 import React from 'react';
 import ScoreCard from './ScoreCard';
 
@@ -7,10 +7,11 @@ interface GameSummaryProps {
   game: Game;
   course: Course;
   onNewGame: () => void;
+  onPlayMore?: () => void;
   onBack?: () => void;
 }
 
-function GameSummaryComponent({ game, course, onNewGame, onBack }: GameSummaryProps) {
+function GameSummaryComponent({ game, course, onNewGame, onPlayMore, onBack }: GameSummaryProps) {
   const calculateGameSummary = (): GameSummary[] => {
     const summaries: { [playerId: string]: GameSummary } = {};
 
@@ -80,6 +81,15 @@ function GameSummaryComponent({ game, course, onNewGame, onBack }: GameSummaryPr
               >
                 <ArrowLeft className="w-5 h-5" />
                 <span>Back</span>
+              </button>
+            )}
+            {onPlayMore && (
+              <button
+                onClick={onPlayMore}
+                className="flex-1 bg-blue-600 text-white py-4 px-6 rounded-xl font-semibold text-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Play More</span>
               </button>
             )}
             <button
