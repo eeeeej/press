@@ -150,14 +150,16 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
     return aIndex - bIndex;
   });
 
-  const getHoleResults = (): HoleResultData[] => {
+  const getHoleResults = (): (HoleResultData | { isNineHoleTotal: boolean, holeNumber: number, label: string })[] => {
     // Get the actual count of holes that have been played
     const holesPlayed = game.status === 'completed' 
       ? course.holes.length  // If game is complete, use the course length
       : game.currentHole - 1; // Otherwise use currentHole - 1 (since currentHole is 1-indexed)
     
-    // Create an array for all played holes
-    return Array.from({ length: holesPlayed }, (_, i) => {
+    const results: (HoleResultData | { isNineHoleTotal: boolean, holeNumber: number, label: string })[] = [];
+    
+    // Create an array for all played holes with 9-hole totals inserted
+    for (let i = 0; i < holesPlayed; i++) {
       const holeNumber = i + 1;
       const holeScore = game.holeScores.find(hs => hs.holeNumber === holeNumber);
       const holeResults: { [playerId: string]: HoleResult } = {};
@@ -184,16 +186,37 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
         });
       }
       
-      return {
+      results.push({
         holeNumber,
         bankerId: holeScore?.bankerId || sortedPlayers[0]?.id || '',
         par: course.holes.find(h => h.number === holeNumber)?.par || 0,
         results: holeResults
-      };
-    });
+      });
+      
+      // Add 9-hole total after hole 9
+      if (holeNumber === 9) {
+        results.push({ isNineHoleTotal: true, holeNumber: 9, label: '9' });
+      }
+      
+      // Add 18-hole total after hole 18
+      if (holeNumber === 18) {
+        results.push({ isNineHoleTotal: true, holeNumber: 18, label: '18' });
+      }
+    }
+    
+    return results;
   };
 
   const holeResults = getHoleResults();
+
+  // Calculate 9-hole totals for each player
+  const getNineHoleTotals = (playerId: string, startHole: number, endHole: number) => {
+    const holesInRange = holeResults.filter((h): h is HoleResultData => !('isNineHoleTotal' in h) && h.holeNumber >= startHole && h.holeNumber <= endHole);
+    const score = holesInRange.reduce((sum, hole) => sum + (hole.results[playerId]?.score || 0), 0);
+    const par = holesInRange.reduce((sum, hole) => sum + hole.par, 0);
+    const relativeToPar = score - par;
+    return { score, par, relativeToPar };
+  };
 
   // Calculate player summaries if not provided
   const calculatedSummaries = summaries.length > 0 ? summaries : (() => {
@@ -258,8 +281,8 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
           <table className="w-full text-xs border-collapse relative">
         <colgroup>
           <col style={{ width: '120px', minWidth: '120px' }} />
-          {holeResults.map((_, index) => (
-            <col key={`col-${index}`} style={{ width: '50px', minWidth: '50px' }} />
+          {holeResults.map((item, index) => (
+            <col key={`col-${index}`} style={('isNineHoleTotal' in item) ? { width: '60px', minWidth: '60px' } : { width: '50px', minWidth: '50px' }} />
           ))}
           <col style={{ width: '80px', minWidth: '80px' }} />
         </colgroup>
@@ -268,24 +291,47 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
             <tr className="bg-gray-800 text-white">
               <th className="p-2 text-left sticky left-0 z-10 bg-gray-800 shadow-md">Player (HCP)</th>
               {/* Hole Numbers */}
-              {holeResults.map(hole => (
-                <th key={hole.holeNumber} className="p-2 text-center border-l border-gray-600 w-12">
-                  <div>{hole.holeNumber}</div>
-                  <div className="text-xs text-gray-300">{hole.par}</div>
-                </th>
-              ))}
+              {holeResults.map((item, index) => {
+                if ('isNineHoleTotal' in item) {
+                  return (
+                    <th key={`total-${index}`} className="p-2 text-center border-l-2 border-gray-600 w-16 bg-gray-700">
+                    </th>
+                  );
+                }
+                return (
+                  <th key={item.holeNumber} className="p-2 text-center border-l border-gray-600 w-12">
+                    <div>{item.holeNumber}</div>
+                    <div className="text-xs text-gray-300">{item.par}</div>
+                  </th>
+                );
+              })}
               <th className="p-2 text-center border-l-2 border-gray-600 w-16">Total</th>
             </tr>
             {/* Par Row */}
             <tr className="bg-gray-100 font-medium border-t-2 border-gray-300">
               <td className="p-2 text-left sticky left-0 z-10 bg-gray-100 shadow-md">Par</td>
-              {holeResults.map(hole => (
-                <td key={`par-${hole.holeNumber}`} className="p-1 text-center border-l border-gray-200">
-                  {hole.par}
-                </td>
-              ))}
+              {holeResults.map((item, index) => {
+                if ('isNineHoleTotal' in item) {
+                  // Calculate par for the 9-hole range
+                  const startHole = item.holeNumber === 9 ? 1 : 10;
+                  const endHole = item.holeNumber;
+                  const parTotal = holeResults
+                    .filter((h): h is HoleResultData => !('isNineHoleTotal' in h) && h.holeNumber >= startHole && h.holeNumber <= endHole)
+                    .reduce((sum, h) => sum + h.par, 0);
+                  return (
+                    <td key={`par-${index}`} className="p-2 text-center border-l-2 border-gray-300 font-medium bg-gray-200">
+                      {parTotal}
+                    </td>
+                  );
+                }
+                return (
+                  <td key={`par-${item.holeNumber}`} className="p-1 text-center border-l border-gray-200">
+                    {item.par}
+                  </td>
+                );
+              })}
               <td className="p-2 text-center border-l-2 border-gray-300">
-                {holeResults.reduce((sum, hole) => sum + hole.par, 0)}
+                {holeResults.filter((h): h is HoleResultData => !('isNineHoleTotal' in h)).reduce((sum, h) => sum + h.par, 0)}
               </td>
             </tr>
           </thead>
@@ -294,9 +340,13 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
           {/* Player Rows */}
           {sortedPlayers.map(player => {
             const totalScore = holeResults.reduce((sum, hole) => {
+              if ('isNineHoleTotal' in hole) return sum;
               return sum + (hole.results[player.id]?.score || 0);
             }, 0);
-            const totalPar = holeResults.reduce((sum, hole) => sum + hole.par, 0);
+            const totalPar = holeResults.reduce((sum, hole) => {
+              if ('isNineHoleTotal' in hole) return sum;
+              return sum + hole.par;
+            }, 0);
             const relativeToPar = totalScore - totalPar;
             
             return (
@@ -310,14 +360,35 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
                 </td>
                 
                 {/* Hole Scores */}
-                {holeResults.map(hole => {
-                  const isBanker = hole.bankerId === player.id;
-                  const score = hole.results[player.id]?.score || 0;
-                  const relativeToHolePar = score - hole.par;
-                  const amount = hole.results[player.id]?.amount || 0;
+                {holeResults.map((item, index) => {
+                  if ('isNineHoleTotal' in item) {
+                    // Display 9-hole total
+                    const startHole = item.holeNumber === 9 ? 1 : 10;
+                    const endHole = item.holeNumber;
+                    const nineHoleTotal = getNineHoleTotals(player.id, startHole, endHole);
+                    return (
+                      <td key={`${player.id}-total-${index}`} className="p-2 text-center border-l-2 border-gray-200 font-medium bg-gray-50">
+                        <div className={`font-mono text-sm ${
+                          nineHoleTotal.relativeToPar < 0 ? 'text-blue-600' :
+                          nineHoleTotal.relativeToPar > 0 ? 'text-red-600' : 'text-green-600'
+                        }`}>
+                          {nineHoleTotal.score}
+                          <span className="text-xs font-normal text-gray-600 ml-1">
+                            ({nineHoleTotal.relativeToPar > 0 ? '+' : ''}{nineHoleTotal.relativeToPar === 0 ? 'E' : nineHoleTotal.relativeToPar})
+                          </span>
+                        </div>
+                      </td>
+                    );
+                  }
+                  
+                  // Display individual hole score
+                  const isBanker = item.bankerId === player.id;
+                  const score = item.results[player.id]?.score || 0;
+                  const relativeToHolePar = score - item.par;
+                  const amount = item.results[player.id]?.amount || 0;
                   
                   return (
-                    <td key={`${player.id}-${hole.holeNumber}`} className={`p-1 border-l border-gray-100 relative h-16 ${isBanker ? 'bg-yellow-50' : ''}`}>
+                    <td key={`${player.id}-${item.holeNumber}`} className={`p-1 border-l border-gray-100 relative h-16 ${isBanker ? 'bg-yellow-50' : ''}`}>
                       <div className="relative h-full flex flex-col rounded">
                         {/* Top row with amount */}
                         <div className="flex justify-end px-1 pt-1 min-h-[20px]">
