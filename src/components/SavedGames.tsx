@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useGamePersistence, SavedGame } from '../hooks/useGamePersistence';
 import { Clock, CheckCircle, Trash2, ArrowLeft, Plus } from 'lucide-react';
 
@@ -10,10 +11,25 @@ interface SavedGamesProps {
 
 export default function SavedGames({ onResumeGame, onDeleteGame, onBack, onNewGame }: SavedGamesProps) {
   const { getSavedGames, getInProgressGames, getCompletedGames } = useGamePersistence();
-  
-  const inProgressGames = getInProgressGames();
-  const completedGames = getCompletedGames();
-  const allGames = getSavedGames();
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [inProgressGames, setInProgressGames] = useState<SavedGame[]>([]);
+  const [completedGames, setCompletedGames] = useState<SavedGame[]>([]);
+  const [allGames, setAllGames] = useState<SavedGame[]>([]);
+
+  const refreshGames = () => {
+    setInProgressGames(getInProgressGames());
+    setCompletedGames(getCompletedGames());
+    setAllGames(getSavedGames());
+  };
+
+  useEffect(() => {
+    refreshGames();
+  }, [refreshKey]);
+
+  const handleDeleteGame = (gameId: string) => {
+    onDeleteGame(gameId);
+    setRefreshKey(prev => prev + 1);
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -63,7 +79,7 @@ export default function SavedGames({ onResumeGame, onDeleteGame, onBack, onNewGa
             {game.status === 'completed' ? 'View' : 'Resume'}
           </button>
           <button
-            onClick={() => onDeleteGame(game.id)}
+            onClick={() => handleDeleteGame(game.id)}
             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
             title="Delete game"
           >
