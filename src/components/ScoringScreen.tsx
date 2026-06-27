@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Player, Course, Game, HoleScore, PlayerScore, GameSummary } from '../types';
 import { calculateHandicapDiff, calculateBankerMatches, getNextBanker } from '../utils/gameLogic';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 import { Minus, Plus, Crown, ArrowLeft, ArrowRight, DollarSign, Zap, LayoutGrid, List, ChevronUp, ChevronDown } from 'lucide-react';
 import ScoreCard from './ScoreCard';
 
@@ -14,7 +15,7 @@ interface ScoringScreenProps {
 
 function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: ScoringScreenProps) {
   const [currentScores, setCurrentScores] = useState<PlayerScore[]>([]);
-  const [defaultBetAmount, setDefaultBetAmount] = useState<number>(1);
+  const [defaultBetAmount, setDefaultBetAmount] = useLocalStorage<number>('banker-default-bet', 5);
   const [playerBets, setPlayerBets] = useState<{ [playerId: string]: number }>({});
   const [bankerPressed, setBankerPressed] = useState<boolean>(false);
   const [selectedBankerId, setSelectedBankerId] = useState<string>('');
@@ -106,7 +107,6 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
   useEffect(() => {
     if (!currentHole) {
       setCurrentScores([]);
-      setDefaultBetAmount(1);
       setBankerPressed(false);
       setPlayerBets({});
       return;
@@ -128,12 +128,12 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
       console.log('Initialized player bets from initialWagers:', bets);
       setPlayerBets(bets);
     } else {
-      // Get the previous hole's bet amount or use 1 as default
+      // Get the previous hole's bet amount or use saved default
       const previousHole = game.holeScores
         .filter(hs => hs.holeNumber < game.currentHole)
         .sort((a, b) => b.holeNumber - a.holeNumber)[0];
       
-      const betAmount = previousHole?.betAmount || 1;
+      const betAmount = previousHole?.betAmount || defaultBetAmount;
       
       const banker = getBankerForHole(selectedBankerId);
       const initialScores: PlayerScore[] = orderedPlayers.map(player => {
@@ -467,6 +467,20 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
               {/* Default Bet Amount */}
               <div className="flex items-center space-x-2 bg-green-50 px-3 py-2 rounded-lg">
                 <DollarSign className="w-4 h-4 text-green-600" />
+                <button
+                  onClick={() => {
+                    const newAmount = Math.max(1, defaultBetAmount - 1);
+                    setDefaultBetAmount(newAmount);
+                    const updatedBets: { [playerId: string]: number } = {};
+                    orderedPlayers.forEach(player => {
+                      updatedBets[player.id] = newAmount;
+                    });
+                    setPlayerBets(updatedBets);
+                  }}
+                  className="w-8 h-8 flex items-center justify-center bg-green-200 hover:bg-green-300 rounded text-green-700 font-bold text-lg"
+                >
+                  -
+                </button>
                 <input
                   type="number"
                   min="1"
@@ -484,6 +498,20 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
                   }}
                   className="w-12 text-center bg-transparent text-sm font-semibold text-green-700 border-none outline-none"
                 />
+                <button
+                  onClick={() => {
+                    const newAmount = Math.min(100, defaultBetAmount + 1);
+                    setDefaultBetAmount(newAmount);
+                    const updatedBets: { [playerId: string]: number } = {};
+                    orderedPlayers.forEach(player => {
+                      updatedBets[player.id] = newAmount;
+                    });
+                    setPlayerBets(updatedBets);
+                  }}
+                  className="w-8 h-8 flex items-center justify-center bg-green-200 hover:bg-green-300 rounded text-green-700 font-bold text-lg"
+                >
+                  +
+                </button>
               </div>
               
               {/* Banker Info */}
