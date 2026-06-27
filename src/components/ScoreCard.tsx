@@ -463,13 +463,15 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
                   const holeScore = game.holeScores.find(hs => hs.holeNumber === item.holeNumber);
                   const playerScore = holeScore?.playerScores.find(ps => ps.playerId === player.id);
                   const isPressed = playerScore?.pressed || false;
+                  // Check if banker pressed on this hole
+                  const isBankerPressed = isBanker && holeScore?.bankerPressed || false;
                   
                   return (
                     <td key={`${player.id}-${item.holeNumber}`} className={`p-1 border-l border-gray-100 relative h-16 ${isBanker ? 'bg-yellow-50' : ''}`}>
                       <div className="relative h-full flex flex-col rounded">
                         {/* Lightning icon if pressed */}
-                        {isPressed && (
-                          <div className="absolute top-0 right-0 p-0.5">
+                        {(isPressed || isBankerPressed) && (
+                          <div className="absolute top-0 left-0 p-0.5">
                             <Zap className="w-3 h-3 text-yellow-500" />
                           </div>
                         )}
