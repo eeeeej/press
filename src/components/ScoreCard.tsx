@@ -334,21 +334,28 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
           </div>
 
           {liveShareEnabled && liveShareUrl && (
-            <div className="flex items-center gap-2 self-end max-w-full bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-              <Radio className="w-4 h-4 text-blue-600 flex-shrink-0 animate-pulse" />
-              <input
-                readOnly
-                value={liveShareUrl}
-                onFocus={(e) => e.currentTarget.select()}
-                className="bg-transparent text-xs text-blue-800 w-56 max-w-full outline-none"
-              />
-              <button
-                onClick={() => copyToClipboard(liveShareUrl)}
-                className="flex items-center space-x-1 text-blue-700 hover:text-blue-900 text-xs font-medium flex-shrink-0"
-              >
-                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? 'Copied' : 'Copy'}</span>
-              </button>
+            <div className="flex flex-col gap-1 self-end max-w-full bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2 max-w-full">
+                <Radio className="w-4 h-4 text-blue-600 flex-shrink-0 animate-pulse" />
+                <input
+                  readOnly
+                  value={liveShareUrl}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="bg-transparent text-xs text-blue-800 w-56 max-w-full outline-none"
+                />
+                <button
+                  onClick={() => copyToClipboard(liveShareUrl)}
+                  className="flex items-center space-x-1 text-blue-700 hover:text-blue-900 text-xs font-medium flex-shrink-0"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copied ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-blue-700 leading-snug">
+                {copied
+                  ? 'Link copied — share it so others can watch this scorecard update live after each hole.'
+                  : 'Anyone with this link can watch this scorecard update live after each hole.'}
+              </p>
             </div>
           )}
         </div>
