@@ -9,6 +9,9 @@ import CourseSelection from './components/CourseSelection';
 import ScoringScreen from './components/ScoringScreen';
 import GameSummary from './components/GameSummary';
 import SavedGames from './components/SavedGames';
+import LiveScoreCardView from './components/LiveScoreCardView';
+import { isLiveShareEnabled } from './lib/supabase';
+import { buildShareUrl, getShareId, getViewShareId, pushScorecard } from './lib/liveShare';
 
 type GameState = 'players' | 'course' | 'playing' | 'complete' | 'saved-games' | 'play-more-course';
 
@@ -17,7 +20,11 @@ function App() {
   const [players, setPlayers] = useLocalStorage<Player[]>('banker-players', []);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [currentGame, setCurrentGame] = useLocalStorage<Game | null>('banker-current-game', null);
+  const [liveShareUrl, setLiveShareUrl] = useState<string | null>(null);
   const { saveGame, loadGame, deleteGame } = useGamePersistence();
+
+  // Public read-only live view: /view/<shareId> renders the shared scorecard.
+  const viewShareId = getViewShareId();
 
   // Auto-save game whenever it changes
   useEffect(() => {
@@ -25,6 +32,30 @@ function App() {
       saveGame(currentGame, selectedCourse.name);
     }
   }, [currentGame, selectedCourse, saveGame]);
+
+  // Keep the visible live link in sync with the current game, and mirror every
+  // change to the shared row once live sharing has been started for this game
+  // (i.e. a share id already exists).
+  useEffect(() => {
+    if (!currentGame) {
+      setLiveShareUrl(null);
+      return;
+    }
+    const shareId = getShareId(currentGame.id);
+    setLiveShareUrl(shareId ? buildShareUrl(shareId) : null);
+    if (shareId && selectedCourse) {
+      pushScorecard(currentGame, selectedCourse);
+    }
+  }, [currentGame, selectedCourse]);
+
+  const handleShareLive = async (): Promise<string | null> => {
+    if (!currentGame || !selectedCourse) return null;
+    const shareId = await pushScorecard(currentGame, selectedCourse);
+    if (!shareId) return null;
+    const url = buildShareUrl(shareId);
+    setLiveShareUrl(url);
+    return url;
+  };
 
   const handlePlayersNext = () => {
     setGameState('course');
@@ -233,6 +264,10 @@ function App() {
 
   console.log('Rendering App with gameState:', gameState);
 
+  if (viewShareId) {
+    return <LiveScoreCardView shareId={viewShareId} />;
+  }
+
   if (gameState === 'players') {
     console.log('Rendering PlayerManagement');
     return (
@@ -268,6 +303,9 @@ function App() {
         onGameUpdate={handleGameUpdate}
         onFinishGame={handleFinishGame}
         onBack={handleBackToCourse}
+        liveShareEnabled={isLiveShareEnabled}
+        liveShareUrl={liveShareUrl}
+        onShareLive={handleShareLive}
       />
     );
   }
@@ -281,6 +319,9 @@ function App() {
         onNewGame={handleNewGame}
         onPlayMore={handlePlayMore}
         onBack={handleBackToPlaying}
+        liveShareEnabled={isLiveShareEnabled}
+        liveShareUrl={liveShareUrl}
+        onShareLive={handleShareLive}
       />
     );
   }
