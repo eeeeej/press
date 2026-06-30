@@ -288,6 +288,37 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
     return total;
   };
 
+  const skipHole = () => {
+    if (!currentHole) return;
+
+    const banker = getBankerForHole(selectedBankerId);
+    
+    // Create a hole score with no matches (skipped hole)
+    const holeScore: HoleScore = {
+      holeNumber: game.currentHole,
+      bankerId: banker.id,
+      playerScores: [],
+      matches: [], // No matches for skipped hole
+      betAmount: defaultBetAmount,
+      initialWagers: {},
+      bankerPressed: false
+    };
+
+    // Make sure we completely remove any existing hole score for this hole
+    const filteredHoleScores = game.holeScores.filter(hs => hs.holeNumber !== game.currentHole);
+    const updatedHoleScores = [...filteredHoleScores, holeScore];
+    
+    // Create the updated game object
+    const updatedGame: Game = {
+      ...game,
+      holeScores: updatedHoleScores,
+      currentHole: Math.min(game.currentHole + 1, course.holes.length),
+      updatedAt: new Date().toISOString()
+    };
+
+    onGameUpdate(updatedGame);
+  };
+
   const saveHoleAndContinue = async () => {
     if (!currentHole) return;
 
@@ -450,7 +481,14 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
                 Hole {currentHole.number} • Par {currentHole.par} • {currentHole.yards}y • HCP {currentHole.handicap}
               </p>
             </div>
-            <div className="w-9 h-9" /> {/* Spacer */}
+            <button
+              onClick={skipHole}
+              disabled={isLastHole}
+              className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <span>Skip</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Default Bet Amount and Hole Navigation */}

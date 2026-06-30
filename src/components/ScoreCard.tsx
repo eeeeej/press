@@ -4,7 +4,7 @@ import html2canvas from 'html2canvas';
 import { Download, Share2, Zap } from 'lucide-react';
 
 interface HoleResult {
-  score: number;
+  score: number | null;
   amount: number;
 }
 
@@ -151,15 +151,13 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
   });
 
   const getHoleResults = (): (HoleResultData | { isNineHoleTotal: boolean, holeNumber: number, label: string })[] => {
-    // Get the actual count of holes that have been played
-    const holesPlayed = game.status === 'completed' 
-      ? course.holes.length  // If game is complete, use the course length
-      : game.currentHole - 1; // Otherwise use currentHole - 1 (since currentHole is 1-indexed)
+    // Always show all holes from the course
+    const totalHoles = course.holes.length;
     
     const results: (HoleResultData | { isNineHoleTotal: boolean, holeNumber: number, label: string })[] = [];
     
-    // Create an array for all played holes with 9-hole totals inserted
-    for (let i = 0; i < holesPlayed; i++) {
+    // Create an array for all holes with 9-hole totals inserted
+    for (let i = 0; i < totalHoles; i++) {
       const holeNumber = i + 1;
       const holeScore = game.holeScores.find(hs => hs.holeNumber === holeNumber);
       const holeResults: { [playerId: string]: HoleResult } = {};
@@ -168,7 +166,7 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
       sortedPlayers.forEach(player => {
         const playerScore = holeScore?.playerScores.find(ps => ps.playerId === player.id);
         holeResults[player.id] = {
-          score: playerScore?.score || 0,
+          score: playerScore?.score ?? null, // Use null for skipped holes
           amount: 0
         };
       });
@@ -455,8 +453,8 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
                   
                   // Display individual hole score
                   const isBanker = item.bankerId === player.id;
-                  const score = item.results[player.id]?.score || 0;
-                  const relativeToHolePar = score - item.par;
+                  const score = item.results[player.id]?.score;
+                  const relativeToHolePar = score !== null ? score - item.par : 0;
                   const amount = item.results[player.id]?.amount || 0;
                   
                   // Check if player pressed on this hole
@@ -488,12 +486,14 @@ const ScoreCard: React.FC<ScoreCardProps> = ({ game, course, summaries = [], sho
                         
                         {/* Score at the bottom */}
                         <div className="mt-auto">
-                          <div className={`font-mono text-sm text-center ${
-                            relativeToHolePar < 0 ? 'text-blue-600' :
-                            relativeToHolePar > 0 ? 'text-red-600' : 'text-green-600'
-                          }`}>
-                            {score}
-                          </div>
+                          {score !== null ? (
+                            <div className={`font-mono text-sm text-center ${
+                              relativeToHolePar < 0 ? 'text-blue-600' :
+                              relativeToHolePar > 0 ? 'text-red-600' : 'text-green-600'
+                            }`}>
+                              {score}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     </td>
