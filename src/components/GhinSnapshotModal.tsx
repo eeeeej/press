@@ -8,7 +8,7 @@ interface GhinSnapshotModalProps {
   existingCount: number;
   maxPlayers: number;
   onClose: () => void;
-  onAddPlayers: (players: Player[]) => void;
+  onAddPlayers: (players: Player[], replaceExisting: boolean) => void;
 }
 
 interface ReviewPlayer {
@@ -32,10 +32,11 @@ export default function GhinSnapshotModal({
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [reviewPlayers, setReviewPlayers] = useState<ReviewPlayer[]>([]);
+  const [removeExisting, setRemoveExisting] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  const remainingSlots = Math.max(0, maxPlayers - existingCount);
+  const remainingSlots = Math.max(0, maxPlayers - (removeExisting ? 0 : existingCount));
 
   const handleFile = async (file: File) => {
     setError(null);
@@ -111,7 +112,7 @@ export default function GhinSnapshotModal({
         displayName: p.displayName.trim(),
         handicap: p.handicap,
       }));
-    onAddPlayers(newPlayers);
+    onAddPlayers(newPlayers, removeExisting);
   };
 
   return (
@@ -284,6 +285,20 @@ export default function GhinSnapshotModal({
                   </div>
                 ))}
               </div>
+
+              {existingCount > 0 && (
+                <label className="flex items-center space-x-3 pt-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={removeExisting}
+                    onChange={(e) => setRemoveExisting(e.target.checked)}
+                    className="w-5 h-5 accent-emerald-600 flex-shrink-0"
+                  />
+                  <span className="text-sm text-gray-700">
+                    Remove existing {existingCount === 1 ? 'player' : 'players'} ({existingCount})
+                  </span>
+                </label>
+              )}
 
               <div className="flex space-x-3 pt-2">
                 <button

@@ -74,9 +74,10 @@ export default function PlayerManagement({ players, onPlayersChange, onNext, onS
     onPlayersChange(players.filter(p => p.id !== playerId));
   };
 
-  const handleGhinPlayersAdd = (newPlayers: Player[]) => {
-    const availableSlots = Math.max(0, MAX_PLAYERS - players.length);
-    onPlayersChange([...players, ...newPlayers.slice(0, availableSlots)]);
+  const handleGhinPlayersAdd = (newPlayers: Player[], replaceExisting: boolean) => {
+    const basePlayers = replaceExisting ? [] : players;
+    const availableSlots = Math.max(0, MAX_PLAYERS - basePlayers.length);
+    onPlayersChange([...basePlayers, ...newPlayers.slice(0, availableSlots)]);
     setShowGhinModal(false);
   };
 
