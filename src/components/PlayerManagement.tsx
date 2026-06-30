@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Player } from '../types';
-import { UserPlus, Edit3, Trash2, User, Clock } from 'lucide-react';
+import { UserPlus, Edit3, Trash2, User, Clock, ScanLine } from 'lucide-react';
+import GhinSnapshotModal from './GhinSnapshotModal';
 
 interface PlayerManagementProps {
   players: Player[];
@@ -12,6 +13,8 @@ interface PlayerManagementProps {
 export default function PlayerManagement({ players, onPlayersChange, onNext, onShowSavedGames }: PlayerManagementProps) {
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showGhinModal, setShowGhinModal] = useState(false);
+  const MAX_PLAYERS = 10;
   const [formData, setFormData] = useState({
     name: '',
     displayName: '',
@@ -69,6 +72,12 @@ export default function PlayerManagement({ players, onPlayersChange, onNext, onS
 
   const handleDeletePlayer = (playerId: string) => {
     onPlayersChange(players.filter(p => p.id !== playerId));
+  };
+
+  const handleGhinPlayersAdd = (newPlayers: Player[]) => {
+    const availableSlots = Math.max(0, MAX_PLAYERS - players.length);
+    onPlayersChange([...players, ...newPlayers.slice(0, availableSlots)]);
+    setShowGhinModal(false);
   };
 
   const canProceed = players.length >= 2;
@@ -180,15 +189,24 @@ export default function PlayerManagement({ players, onPlayersChange, onNext, onS
             </div>
           )}
 
-          {/* Add Player Button */}
-          {!showAddForm && players.length < 10 && (
-            <button
-              onClick={handleAddPlayer}
-              className="w-full border-2 border-dashed border-emerald-300 text-emerald-600 py-4 px-4 rounded-xl font-semibold hover:bg-emerald-50 transition-colors flex items-center justify-center space-x-2"
-            >
-              <UserPlus className="w-5 h-5" />
-              <span>Add Player ({players.length}/10)</span>
-            </button>
+          {/* Add Player Buttons */}
+          {!showAddForm && players.length < MAX_PLAYERS && (
+            <div className="space-y-3">
+              <button
+                onClick={handleAddPlayer}
+                className="w-full border-2 border-dashed border-emerald-300 text-emerald-600 py-4 px-4 rounded-xl font-semibold hover:bg-emerald-50 transition-colors flex items-center justify-center space-x-2"
+              >
+                <UserPlus className="w-5 h-5" />
+                <span>Add Player ({players.length}/{MAX_PLAYERS})</span>
+              </button>
+              <button
+                onClick={() => setShowGhinModal(true)}
+                className="w-full border-2 border-dashed border-emerald-300 text-emerald-600 py-4 px-4 rounded-xl font-semibold hover:bg-emerald-50 transition-colors flex items-center justify-center space-x-2"
+              >
+                <ScanLine className="w-5 h-5" />
+                <span>Add via GHIN Snapshot</span>
+              </button>
+            </div>
           )}
 
           {/* Continue Button */}
@@ -217,6 +235,15 @@ export default function PlayerManagement({ players, onPlayersChange, onNext, onS
           </div>
         </div>
       </div>
+
+      {showGhinModal && (
+        <GhinSnapshotModal
+          existingCount={players.length}
+          maxPlayers={MAX_PLAYERS}
+          onClose={() => setShowGhinModal(false)}
+          onAddPlayers={handleGhinPlayersAdd}
+        />
+      )}
     </div>
   );
 }
