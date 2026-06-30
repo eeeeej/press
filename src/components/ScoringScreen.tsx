@@ -11,9 +11,12 @@ interface ScoringScreenProps {
   onGameUpdate: (game: Game) => void;
   onFinishGame: (game: Game) => void;
   onBack: () => void;
+  liveShareEnabled?: boolean;
+  liveShareUrl?: string | null;
+  onShareLive?: () => Promise<string | null> | void;
 }
 
-function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: ScoringScreenProps) {
+function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack, liveShareEnabled, liveShareUrl, onShareLive }: ScoringScreenProps) {
   const [currentScores, setCurrentScores] = useState<PlayerScore[]>([]);
   const [defaultBetAmount, setDefaultBetAmount] = useLocalStorage<number>('banker-default-bet', 5);
   const [wagerIncrement, setWagerIncrement] = useLocalStorage<number>('banker-wager-increment', 1);
@@ -794,6 +797,9 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack }: Sco
                   game={game} 
                   course={course} 
                   summaries={gameSummary}
+                  liveShareEnabled={liveShareEnabled}
+                  liveShareUrl={liveShareUrl}
+                  onShareLive={onShareLive}
                 />
               </div>
             </>

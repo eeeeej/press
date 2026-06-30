@@ -9,9 +9,12 @@ interface GameSummaryProps {
   onNewGame: () => void;
   onPlayMore?: () => void;
   onBack?: () => void;
+  liveShareEnabled?: boolean;
+  liveShareUrl?: string | null;
+  onShareLive?: () => Promise<string | null> | void;
 }
 
-function GameSummaryComponent({ game, course, onNewGame, onPlayMore, onBack }: GameSummaryProps) {
+function GameSummaryComponent({ game, course, onNewGame, onPlayMore, onBack, liveShareEnabled, liveShareUrl, onShareLive }: GameSummaryProps) {
   const calculateGameSummary = (): GameSummary[] => {
     const summaries: { [playerId: string]: GameSummary } = {};
 
@@ -70,6 +73,9 @@ function GameSummaryComponent({ game, course, onNewGame, onPlayMore, onBack }: G
               course={course}
               summaries={summaries}
               showHeader={true}
+              liveShareEnabled={liveShareEnabled}
+              liveShareUrl={liveShareUrl}
+              onShareLive={onShareLive}
             />
           </div>
 
