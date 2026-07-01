@@ -117,8 +117,20 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack, liveS
     }
     
     const existingHoleScore = game.holeScores.find(hs => hs.holeNumber === game.currentHole);
-    
-    if (existingHoleScore) {
+
+    // Default per-player scores (par) used for fresh holes and for revisiting a
+    // skipped hole, which is stored with no player scores.
+    const buildInitialScores = (): PlayerScore[] => {
+      const banker = getBankerForHole(selectedBankerId);
+      return orderedPlayers.map(player => ({
+        playerId: player.id,
+        score: currentHole.par,
+        handicapDiff: calculateHandicapDiff(banker.handicap, player.handicap, currentHole.handicap),
+        pressed: false,
+      }));
+    };
+
+    if (existingHoleScore && existingHoleScore.playerScores.length > 0) {
       setCurrentScores(existingHoleScore.playerScores);
       setDefaultBetAmount(existingHoleScore.betAmount);
       setBankerPressed(existingHoleScore.bankerPressed);
@@ -137,25 +149,9 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack, liveS
         .filter(hs => hs.holeNumber < game.currentHole)
         .sort((a, b) => b.holeNumber - a.holeNumber)[0];
       
-      const betAmount = previousHole?.betAmount || defaultBetAmount;
-      
-      const banker = getBankerForHole(selectedBankerId);
-      const initialScores: PlayerScore[] = orderedPlayers.map(player => {
-        const handicapDiff = calculateHandicapDiff(
-          banker.handicap,
-          player.handicap,
-          currentHole.handicap
-        );
-        
-        return {
-          playerId: player.id,
-          score: currentHole.par, // Default to par
-          handicapDiff,
-          pressed: false
-        };
-      });
-      
-      setCurrentScores(initialScores);
+      const betAmount = existingHoleScore?.betAmount || previousHole?.betAmount || defaultBetAmount;
+
+      setCurrentScores(buildInitialScores());
       setDefaultBetAmount(betAmount);
       setBankerPressed(false);
       
