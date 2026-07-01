@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
-import { Radio, Copy, Check, Loader2, AlertCircle } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import { Radio, Copy, Check, Loader2, AlertCircle, X } from 'lucide-react';
+
+const SHARE_EXPLAINER =
+  'Anyone with this link can watch this scorecard update live after each hole.';
 
 interface LiveShareButtonProps {
   // Existing public link for this game, if live sharing was already started.
@@ -18,6 +22,7 @@ const LiveShareButton: React.FC<LiveShareButtonProps> = ({
   const [liveSharePending, setLiveSharePending] = useState(false);
   const [copied, setCopied] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [showQR, setShowQR] = useState(false);
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -51,89 +56,96 @@ const LiveShareButton: React.FC<LiveShareButtonProps> = ({
     }
   };
 
-  if (compact) {
-    // In compact mode the started link copies to the clipboard on tap instead
-    // of expanding into a full link box, to keep the banner uncluttered.
-    const handleClick = liveShareUrl
-      ? () => copyToClipboard(liveShareUrl)
-      : handleStartLiveShare;
+  // Once a link exists, the button reveals a QR code (with copy) instead of
+  // re-creating the share.
+  const handleClick = () => {
+    if (liveShareUrl) {
+      setShowQR(true);
+    } else {
+      handleStartLiveShare();
+    }
+  };
 
-    return (
-      <div className="flex items-center">
-        <button
-          onClick={handleClick}
-          disabled={liveSharePending}
-          className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50 transition-colors ${
-            liveShareUrl ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
-          }`}
-          title={
-            liveShareUrl
-              ? 'Live — tap to copy the link others can watch'
-              : 'Create a live link that updates after each hole'
-          }
-        >
-          {liveSharePending ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : copied ? (
-            <Check className="w-3.5 h-3.5" />
-          ) : (
-            <Radio className={`w-3.5 h-3.5 ${liveShareUrl ? 'animate-pulse' : ''}`} />
-          )}
-          <span>{copied ? 'Copied' : liveShareUrl ? 'Live' : 'Share Live'}</span>
-        </button>
-        {shareError && (
-          <AlertCircle className="w-4 h-4 text-red-600 ml-1 flex-shrink-0" title={shareError} />
-        )}
-      </div>
-    );
-  }
+  const buttonClasses = compact
+    ? 'flex items-center space-x-1 px-2.5 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors text-xs font-medium'
+    : 'flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm self-end';
+  const iconSize = compact ? 'w-3.5 h-3.5' : 'w-4 h-4';
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className={compact ? 'flex items-center' : 'flex flex-col gap-2'}>
       <button
-        onClick={handleStartLiveShare}
+        onClick={handleClick}
         disabled={liveSharePending}
-        className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm self-end"
-        title="Create a live link that updates after each hole"
+        className={buttonClasses}
+        title={SHARE_EXPLAINER}
       >
         {liveSharePending ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
+          <Loader2 className={`${iconSize} animate-spin`} />
         ) : (
-          <Radio className="w-4 h-4" />
+          <Radio className={`${iconSize} ${liveShareUrl ? 'animate-pulse' : ''}`} />
         )}
-        <span>{liveShareUrl ? 'Live Link' : 'Share Live'}</span>
+        <span>{liveShareUrl ? 'Live' : 'Share Live'}</span>
       </button>
 
-      {liveShareUrl && (
-        <div className="flex flex-col gap-1 self-end max-w-full bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-          <div className="flex items-center gap-2 max-w-full">
-            <Radio className="w-4 h-4 text-blue-600 flex-shrink-0 animate-pulse" />
-            <input
-              readOnly
-              value={liveShareUrl}
-              onFocus={(e) => e.currentTarget.select()}
-              className="bg-transparent text-xs text-blue-800 w-56 max-w-full outline-none"
-            />
-            <button
-              onClick={() => copyToClipboard(liveShareUrl)}
-              className="flex items-center space-x-1 text-blue-700 hover:text-blue-900 text-xs font-medium flex-shrink-0"
-            >
-              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? 'Copied' : 'Copy'}</span>
-            </button>
+      {shareError &&
+        (compact ? (
+          <AlertCircle
+            className="w-4 h-4 text-red-600 ml-1 flex-shrink-0"
+            title={shareError}
+          />
+        ) : (
+          <div className="flex items-start gap-2 self-end max-w-full bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-[11px] text-red-700 leading-snug">{shareError}</p>
           </div>
-          <p className="text-[11px] text-blue-700 leading-snug">
-            {copied
-              ? 'Link copied — share it so others can watch this scorecard update live after each hole.'
-              : 'Anyone with this link can watch this scorecard update live after each hole.'}
-          </p>
-        </div>
-      )}
+        ))}
 
-      {shareError && (
-        <div className="flex items-start gap-2 self-end max-w-full bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-          <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-          <p className="text-[11px] text-red-700 leading-snug">{shareError}</p>
+      {showQR && liveShareUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowQR(false)}
+        >
+          <div
+            className="relative bg-white rounded-2xl shadow-xl p-6 w-full max-w-xs flex flex-col items-center gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowQR(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 text-blue-700">
+              <Radio className="w-4 h-4 animate-pulse" />
+              <span className="text-sm font-medium">Live scorecard</span>
+            </div>
+
+            <div className="bg-white p-3 rounded-lg border border-gray-200">
+              <QRCodeSVG value={liveShareUrl} size={200} />
+            </div>
+
+            <p className="text-xs text-gray-500 text-center leading-snug">
+              {SHARE_EXPLAINER}
+            </p>
+
+            <div className="flex items-center gap-2 w-full">
+              <input
+                readOnly
+                value={liveShareUrl}
+                onFocus={(e) => e.currentTarget.select()}
+                className="flex-1 min-w-0 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-700 outline-none"
+              />
+              <button
+                onClick={() => copyToClipboard(liveShareUrl)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 flex-shrink-0"
+              >
+                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copied ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
