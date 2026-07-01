@@ -273,32 +273,30 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
   return (
     <div>
       {/* Share/Download Buttons */}
-      {!readOnly && (
-        <div className="flex flex-col gap-2 mb-3">
-          <div className="flex justify-end space-x-2">
-            <button
-              onClick={handleDownloadImage}
-              className="flex items-center space-x-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
-              title="Download as image"
-            >
-              <Download className="w-4 h-4" />
-              <span>Download</span>
-            </button>
-            <button
-              onClick={handleShareImage}
-              className="flex items-center space-x-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm"
-              title="Share scorecard image"
-            >
-              <Share2 className="w-4 h-4" />
-              <span>Share Image</span>
-            </button>
-          </div>
-
-          {liveShareEnabled && (
-            <LiveShareButton liveShareUrl={liveShareUrl} onShareLive={onShareLive} />
-          )}
+      <div className="flex flex-col gap-2 mb-3">
+        <div className="flex justify-end space-x-2">
+          <button
+            onClick={handleDownloadImage}
+            className="flex items-center space-x-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+            title="Download as image"
+          >
+            <Download className="w-4 h-4" />
+            <span>Download</span>
+          </button>
+          <button
+            onClick={handleShareImage}
+            className="flex items-center space-x-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm"
+            title="Share scorecard image"
+          >
+            <Share2 className="w-4 h-4" />
+            <span>Share</span>
+          </button>
         </div>
-      )}
+
+        {!readOnly && liveShareEnabled && (
+          <LiveShareButton liveShareUrl={liveShareUrl} onShareLive={onShareLive} />
+        )}
+      </div>
       
       <div className="overflow-x-auto" ref={scrollContainerRef}>
         <div ref={scorecardRef}>
