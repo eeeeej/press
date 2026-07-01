@@ -16,7 +16,7 @@ interface ScoringScreenProps {
   onShareLive?: () => Promise<string | null> | void;
 }
 
-function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack, liveShareEnabled, liveShareUrl, onShareLive }: ScoringScreenProps) {
+function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnabled, liveShareUrl, onShareLive }: ScoringScreenProps) {
   const [currentScores, setCurrentScores] = useState<PlayerScore[]>([]);
   const [defaultBetAmount, setDefaultBetAmount] = useLocalStorage<number>('banker-default-bet', 5);
   const [wagerIncrement, setWagerIncrement] = useLocalStorage<number>('banker-wager-increment', 1);
@@ -473,10 +473,12 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack, liveS
         <div className="max-w-lg mx-auto">
           <div className="flex items-center justify-between mb-4">
             <button
-              onClick={onBack}
-              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              onClick={goToPreviousHole}
+              disabled={game.currentHole === 1}
+              className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-4 h-4" />
+              <span>Prev</span>
             </button>
             <div className="text-center">
               <h1 className="text-lg font-bold text-gray-900">{course.name}</h1>
@@ -496,15 +498,6 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, onBack, liveS
 
           {/* Default Bet Amount and Hole Navigation */}
           <div className="flex items-center justify-between">
-            <button
-              onClick={goToPreviousHole}
-              disabled={game.currentHole === 1}
-              className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Prev</span>
-            </button>
-            
             <div className="flex items-center space-x-4">
               {/* Default Bet Amount */}
               <div className="flex items-center space-x-2 bg-green-50 px-3 py-2 rounded-lg">
