@@ -2,9 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Player, Course, Game, HoleScore, PlayerScore, GameSummary } from '../types';
 import { calculateHandicapDiff, calculateBankerMatches, getNextBanker } from '../utils/gameLogic';
 import { useLocalStorage } from '../hooks/useLocalStorage';
-import { Minus, Plus, Crown, ArrowLeft, ArrowRight, DollarSign, Zap, LayoutGrid, List, ChevronUp, ChevronDown, Settings } from 'lucide-react';
+import { Crown, ArrowLeft, ArrowRight, DollarSign, Zap, LayoutGrid, List, ChevronUp, ChevronDown, Settings } from 'lucide-react';
 import ScoreCard from './ScoreCard';
 import LiveShareButton from './LiveShareButton';
+import PickerSheet from './PickerSheet';
+
+const WAGER_OPTIONS = [1, 2, 3, 4, 5, 10, 15, 20, 25, 50, 75, 100];
 
 interface ScoringScreenProps {
   game: Game;
@@ -26,6 +29,7 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
   const [selectedBankerId, setSelectedBankerId] = useState<string>('');
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [activeTab, setActiveTab] = useState<'current' | 'summary' | 'config'>('current');
+  const [picker, setPicker] = useState<{ playerId: string; kind: 'score' | 'wager' } | null>(null);
 
   // Derived state and variables
   const currentHole = useMemo(() => {
@@ -466,7 +470,10 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-green-100">
       {/* Header */}
-      <div className="bg-white shadow-sm p-4">
+      <div
+        className="bg-white shadow-sm p-4"
+        style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top))' }}
+      >
         <div className="max-w-lg mx-auto">
           <div className="flex items-center justify-between mb-4">
             <button
@@ -600,7 +607,10 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
       </div>
 
       {/* Content */}
-      <div className="p-4">
+      <div
+        className="p-4"
+        style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+      >
         <div className="max-w-lg mx-auto">
           {activeTab === 'current' ? (
             <div className="bg-white rounded-2xl shadow-xl p-4">
@@ -614,7 +624,7 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
                   return (
                     <div
                       key={player.id}
-                      className={`flex items-center justify-between p-4 rounded-xl border-2 ${
+                      className={`flex items-center justify-between gap-x-2 gap-y-3 flex-wrap p-4 rounded-xl border-2 ${
                         isBanker 
                           ? 'border-amber-300 bg-amber-50' 
                           : 'border-gray-200 bg-gray-50'
@@ -676,11 +686,11 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
                           <div className="flex items-center space-x-2 text-xs">
                             <span className="text-gray-600">HCP: {player.handicap}</span>
                             {game.currentHole > 1 && (
-                              <span className={`font-semibold ${
-                                runningTotal > 0 ? 'text-green-600' : 
-                                runningTotal < 0 ? 'text-red-600' : 'text-gray-600'
+                              <span className={`font-bold px-1.5 py-0.5 rounded ${
+                                runningTotal > 0 ? 'bg-green-100 text-green-700' :
+                                runningTotal < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
                               }`}>
-                                Total: {runningTotal > 0 ? '+' : ''}{runningTotal}
+                                {runningTotal > 0 ? '+' : runningTotal < 0 ? '-' : ''}${Math.abs(runningTotal)}
                               </span>
                             )}
                           </div>
@@ -696,34 +706,19 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-center space-x-1 bg-blue-50 px-1 py-1 rounded">
-                            <button
-                              onClick={() => updatePlayerBet(player.id, Math.max(1, (playerBets[player.id] || defaultBetAmount) - wagerIncrement))}
-                              className="w-6 h-6 flex items-center justify-center bg-blue-200 hover:bg-blue-300 rounded text-blue-700 font-bold text-xs"
-                            >
-                              -
-                            </button>
-                            <input
-                              type="number"
-                              min="1"
-                              max="100"
-                              value={playerBets[player.id] || defaultBetAmount}
-                              onChange={(e) => updatePlayerBet(player.id, parseInt(e.target.value) || 1)}
-                              className="w-8 text-center bg-transparent text-xs font-semibold text-blue-700 border-none outline-none"
-                            />
-                            <button
-                              onClick={() => updatePlayerBet(player.id, Math.min(100, (playerBets[player.id] || defaultBetAmount) + wagerIncrement))}
-                              className="w-6 h-6 flex items-center justify-center bg-blue-200 hover:bg-blue-300 rounded text-blue-700 font-bold text-xs"
-                            >
-                              +
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => setPicker({ playerId: player.id, kind: 'wager' })}
+                            className="min-h-[44px] px-3 rounded-lg bg-blue-50 text-blue-700 font-semibold text-sm hover:bg-blue-100 active:bg-blue-200 transition-colors"
+                            aria-label={`Set wager for ${player.displayName}`}
+                          >
+                            ${playerBets[player.id] || defaultBetAmount}
+                          </button>
                         )}
                         
                         {/* Press Button */}
                         <button
                           onClick={() => isBanker ? setBankerPressed(!bankerPressed) : togglePress(player.id)}
-                          className={`p-2 rounded-lg transition-all ${
+                          className={`w-11 h-11 flex items-center justify-center rounded-lg transition-all ${
                             (isBanker ? bankerPressed : playerScore?.pressed)
                               ? 'bg-red-100 text-red-600 shadow-md' 
                               : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
@@ -733,34 +728,22 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
                           <Zap className="w-4 h-4" />
                         </button>
                         
-                        {/* Score Controls */}
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => updateScore(player.id, (playerScore?.score || currentHole.par) - 1)}
-                            className="w-8 h-8 bg-red-100 text-red-600 rounded-full flex items-center justify-center hover:bg-red-200 transition-colors"
-                          >
-                            <Minus className="w-4 h-4" />
-                          </button>
-                          
-                          <div className="w-12 text-center">
-                            <div className="text-2xl font-bold text-gray-900">
-                              {playerScore?.score || currentHole.par}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {((playerScore?.score || currentHole.par) - currentHole.par) === 0 ? 'Par' :
-                               ((playerScore?.score || currentHole.par) - currentHole.par) > 0 ? 
-                               `+${(playerScore?.score || currentHole.par) - currentHole.par}` :
-                               `${(playerScore?.score || currentHole.par) - currentHole.par}`}
-                            </div>
-                          </div>
-                          
-                          <button
-                            onClick={() => updateScore(player.id, (playerScore?.score || currentHole.par) + 1)}
-                            className="w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center hover:bg-green-200 transition-colors"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        </div>
+                        {/* Score (tap to change) */}
+                        <button
+                          onClick={() => setPicker({ playerId: player.id, kind: 'score' })}
+                          className="min-w-[2.75rem] min-h-[44px] px-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 active:bg-gray-200 flex flex-col items-center justify-center transition-colors"
+                          aria-label={`Set score for ${player.displayName}`}
+                        >
+                          <span className="text-xl font-bold text-gray-900 leading-none">
+                            {playerScore?.score || currentHole.par}
+                          </span>
+                          <span className="text-xs text-gray-500 mt-0.5">
+                            {((playerScore?.score || currentHole.par) - currentHole.par) === 0 ? 'Par' :
+                             ((playerScore?.score || currentHole.par) - currentHole.par) > 0 ?
+                             `+${(playerScore?.score || currentHole.par) - currentHole.par}` :
+                             `${(playerScore?.score || currentHole.par) - currentHole.par}`}
+                          </span>
+                        </button>
                       </div>
                     </div>
                   );
@@ -841,6 +824,55 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
           )}
         </div>
       </div>
+
+      {picker && (() => {
+        const pickerPlayer = orderedPlayers.find(p => p.id === picker.playerId);
+        if (!pickerPlayer) return null;
+
+        if (picker.kind === 'score') {
+          const pickerScore = currentScores.find(s => s.playerId === picker.playerId);
+          const current = pickerScore?.score || currentHole.par;
+          const base = Array.from({ length: 12 }, (_, i) => i + 1);
+          const values = base.includes(current) ? base : [...base, current].sort((a, b) => a - b);
+          return (
+            <PickerSheet
+              title={pickerPlayer.displayName}
+              subtitle={`Par ${currentHole.par}`}
+              values={values}
+              value={current}
+              highlightValue={currentHole.par}
+              formatSub={(n) => {
+                const d = n - currentHole.par;
+                return d === 0 ? 'Par' : d > 0 ? `+${d}` : `${d}`;
+              }}
+              onSelect={(score) => {
+                updateScore(picker.playerId, score);
+                setPicker(null);
+              }}
+              onClose={() => setPicker(null)}
+            />
+          );
+        }
+
+        const currentBet = playerBets[picker.playerId] || defaultBetAmount;
+        const values = WAGER_OPTIONS.includes(currentBet)
+          ? WAGER_OPTIONS
+          : [...WAGER_OPTIONS, currentBet].sort((a, b) => a - b);
+        return (
+          <PickerSheet
+            title={pickerPlayer.displayName}
+            subtitle="Wager"
+            values={values}
+            value={currentBet}
+            formatValue={(n) => `$${n}`}
+            onSelect={(amount) => {
+              updatePlayerBet(picker.playerId, amount);
+              setPicker(null);
+            }}
+            onClose={() => setPicker(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
