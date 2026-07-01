@@ -686,11 +686,11 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
                           <div className="flex items-center space-x-2 text-xs">
                             <span className="text-gray-600">HCP: {player.handicap}</span>
                             {game.currentHole > 1 && (
-                              <span className={`font-semibold ${
-                                runningTotal > 0 ? 'text-green-600' : 
-                                runningTotal < 0 ? 'text-red-600' : 'text-gray-600'
+                              <span className={`font-bold px-1.5 py-0.5 rounded ${
+                                runningTotal > 0 ? 'bg-green-100 text-green-700' :
+                                runningTotal < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
                               }`}>
-                                Total: {runningTotal > 0 ? '+' : ''}{runningTotal}
+                                {runningTotal > 0 ? '+' : runningTotal < 0 ? '-' : ''}${Math.abs(runningTotal)}
                               </span>
                             )}
                           </div>
