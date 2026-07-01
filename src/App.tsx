@@ -44,7 +44,8 @@ function App() {
     const shareId = getShareId(currentGame.id);
     setLiveShareUrl(shareId ? buildShareUrl(shareId) : null);
     if (shareId && selectedCourse) {
-      pushScorecard(currentGame, selectedCourse);
+      // Background auto-sync; errors are already logged in pushScorecard.
+      pushScorecard(currentGame, selectedCourse).catch(() => {});
     }
   }, [currentGame, selectedCourse]);
 
