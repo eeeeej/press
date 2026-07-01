@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Game, Course, GameSummary } from '../types';
 import html2canvas from 'html2canvas';
-import { Download, Share2, Zap, Radio, Copy, Check, Loader2 } from 'lucide-react';
+import { Download, Share2, Zap, Radio, Copy, Check, Loader2, AlertCircle } from 'lucide-react';
 
 interface HoleResult {
   score: number | null;
@@ -42,15 +42,25 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
 }) => {
   const [liveSharePending, setLiveSharePending] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   const handleStartLiveShare = async () => {
     if (!onShareLive) return;
     setLiveSharePending(true);
+    setShareError(null);
     try {
       const url = (await onShareLive()) || liveShareUrl;
       if (url) {
         await copyToClipboard(url);
+      } else {
+        setShareError("Couldn't create the live link. Please try again.");
       }
+    } catch (error) {
+      setShareError(
+        error instanceof Error && error.message
+          ? `Couldn't create the live link: ${error.message}`
+          : "Couldn't create the live link. Please try again."
+      );
     } finally {
       setLiveSharePending(false);
     }
@@ -356,6 +366,13 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
                   ? 'Link copied — share it so others can watch this scorecard update live after each hole.'
                   : 'Anyone with this link can watch this scorecard update live after each hole.'}
               </p>
+            </div>
+          )}
+
+          {liveShareEnabled && shareError && (
+            <div className="flex items-start gap-2 self-end max-w-full bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <p className="text-[11px] text-red-700 leading-snug">{shareError}</p>
             </div>
           )}
         </div>

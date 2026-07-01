@@ -48,7 +48,8 @@ export function getViewShareId(): string | null {
 
 // Pushes the current game + course state to the shared row. Creates the share
 // id on first call for a given game. Returns the share id, or null if live
-// sharing is not configured.
+// sharing is not configured. Throws if the write to Supabase fails, so callers
+// can surface the problem instead of failing silently.
 export async function pushScorecard(game: Game, course: Course): Promise<string | null> {
   if (!supabase) return null;
 
@@ -66,7 +67,7 @@ export async function pushScorecard(game: Game, course: Course): Promise<string 
 
   if (error) {
     console.error('Failed to push scorecard to live share:', error);
-    return null;
+    throw new Error(error.message || 'Failed to publish the live scorecard.');
   }
 
   rememberShareId(game.id, shareId);
