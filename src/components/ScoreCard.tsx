@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Game, Course, GameSummary } from '../types';
 import html2canvas from 'html2canvas';
-import { Download, Share2, Zap, Radio, Copy, Check, Loader2, AlertCircle } from 'lucide-react';
+import { Download, Share2, Zap } from 'lucide-react';
+import LiveShareButton from './LiveShareButton';
 
 interface HoleResult {
   score: number | null;
@@ -40,41 +41,6 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
   liveShareUrl = null,
   onShareLive,
 }) => {
-  const [liveSharePending, setLiveSharePending] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [shareError, setShareError] = useState<string | null>(null);
-
-  const handleStartLiveShare = async () => {
-    if (!onShareLive) return;
-    setLiveSharePending(true);
-    setShareError(null);
-    try {
-      const url = (await onShareLive()) || liveShareUrl;
-      if (url) {
-        await copyToClipboard(url);
-      } else {
-        setShareError("Couldn't create the live link. Please try again.");
-      }
-    } catch (error) {
-      setShareError(
-        error instanceof Error && error.message
-          ? `Couldn't create the live link: ${error.message}`
-          : "Couldn't create the live link. Please try again."
-      );
-    } finally {
-      setLiveSharePending(false);
-    }
-  };
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard may be unavailable; the link is still shown for manual copy.
-    }
-  };
   // Reference to the scrollable container
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   // Reference to the scorecard for image capture
@@ -307,76 +273,30 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
   return (
     <div>
       {/* Share/Download Buttons */}
-      {!readOnly && (
-        <div className="flex flex-col gap-2 mb-3">
-          <div className="flex justify-end space-x-2">
-            <button
-              onClick={handleDownloadImage}
-              className="flex items-center space-x-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
-              title="Download as image"
-            >
-              <Download className="w-4 h-4" />
-              <span>Download</span>
-            </button>
-            <button
-              onClick={handleShareImage}
-              className="flex items-center space-x-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm"
-              title="Share scorecard image"
-            >
-              <Share2 className="w-4 h-4" />
-              <span>Share Image</span>
-            </button>
-            {liveShareEnabled && (
-              <button
-                onClick={handleStartLiveShare}
-                disabled={liveSharePending}
-                className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm"
-                title="Create a live link that updates after each hole"
-              >
-                {liveSharePending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Radio className="w-4 h-4" />
-                )}
-                <span>{liveShareUrl ? 'Live Link' : 'Share Live'}</span>
-              </button>
-            )}
-          </div>
-
-          {liveShareEnabled && liveShareUrl && (
-            <div className="flex flex-col gap-1 self-end max-w-full bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-              <div className="flex items-center gap-2 max-w-full">
-                <Radio className="w-4 h-4 text-blue-600 flex-shrink-0 animate-pulse" />
-                <input
-                  readOnly
-                  value={liveShareUrl}
-                  onFocus={(e) => e.currentTarget.select()}
-                  className="bg-transparent text-xs text-blue-800 w-56 max-w-full outline-none"
-                />
-                <button
-                  onClick={() => copyToClipboard(liveShareUrl)}
-                  className="flex items-center space-x-1 text-blue-700 hover:text-blue-900 text-xs font-medium flex-shrink-0"
-                >
-                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copied ? 'Copied' : 'Copy'}</span>
-                </button>
-              </div>
-              <p className="text-[11px] text-blue-700 leading-snug">
-                {copied
-                  ? 'Link copied — share it so others can watch this scorecard update live after each hole.'
-                  : 'Anyone with this link can watch this scorecard update live after each hole.'}
-              </p>
-            </div>
-          )}
-
-          {liveShareEnabled && shareError && (
-            <div className="flex items-start gap-2 self-end max-w-full bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-[11px] text-red-700 leading-snug">{shareError}</p>
-            </div>
-          )}
+      <div className="flex flex-col gap-2 mb-3">
+        <div className="flex justify-end space-x-2">
+          <button
+            onClick={handleDownloadImage}
+            className="flex items-center space-x-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+            title="Download as image"
+          >
+            <Download className="w-4 h-4" />
+            <span>Download</span>
+          </button>
+          <button
+            onClick={handleShareImage}
+            className="flex items-center space-x-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm"
+            title="Share scorecard image"
+          >
+            <Share2 className="w-4 h-4" />
+            <span>Share</span>
+          </button>
         </div>
-      )}
+
+        {!readOnly && liveShareEnabled && (
+          <LiveShareButton liveShareUrl={liveShareUrl} onShareLive={onShareLive} />
+        )}
+      </div>
       
       <div className="overflow-x-auto" ref={scrollContainerRef}>
         <div ref={scorecardRef}>

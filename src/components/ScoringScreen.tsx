@@ -4,6 +4,7 @@ import { calculateHandicapDiff, calculateBankerMatches, getNextBanker } from '..
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { Minus, Plus, Crown, ArrowLeft, ArrowRight, DollarSign, Zap, LayoutGrid, List, ChevronUp, ChevronDown, Settings } from 'lucide-react';
 import ScoreCard from './ScoreCard';
+import LiveShareButton from './LiveShareButton';
 
 interface ScoringScreenProps {
   game: Game;
@@ -544,19 +545,15 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
                   +
                 </button>
               </div>
-              
-              {/* Banker Info */}
-              <div className="flex items-center space-x-2">
-                <Crown className="w-4 h-4 text-amber-500" />
-                <span className="text-sm font-medium text-gray-700">
-                  {banker.displayName}
-                </span>
-              </div>
             </div>
-            
-            <div className="text-sm text-gray-500">
-              {game.currentHole}/{course.holes.length}
-            </div>
+
+            {liveShareEnabled && (
+              <LiveShareButton
+                compact
+                liveShareUrl={liveShareUrl}
+                onShareLive={onShareLive}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -786,9 +783,6 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
                   game={game} 
                   course={course} 
                   summaries={gameSummary}
-                  liveShareEnabled={liveShareEnabled}
-                  liveShareUrl={liveShareUrl}
-                  onShareLive={onShareLive}
                 />
               </div>
             </>
