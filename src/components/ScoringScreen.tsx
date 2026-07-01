@@ -5,7 +5,9 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 import { Crown, ArrowLeft, ArrowRight, DollarSign, Zap, LayoutGrid, List, ChevronUp, ChevronDown, Settings } from 'lucide-react';
 import ScoreCard from './ScoreCard';
 import LiveShareButton from './LiveShareButton';
-import ScorePicker from './ScorePicker';
+import PickerSheet from './PickerSheet';
+
+const WAGER_OPTIONS = [1, 2, 3, 4, 5, 10, 15, 20, 25, 50, 75, 100];
 
 interface ScoringScreenProps {
   game: Game;
@@ -27,7 +29,7 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
   const [selectedBankerId, setSelectedBankerId] = useState<string>('');
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [activeTab, setActiveTab] = useState<'current' | 'summary' | 'config'>('current');
-  const [pickerPlayerId, setPickerPlayerId] = useState<string | null>(null);
+  const [picker, setPicker] = useState<{ playerId: string; kind: 'score' | 'wager' } | null>(null);
 
   // Derived state and variables
   const currentHole = useMemo(() => {
@@ -704,28 +706,13 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-center space-x-1 bg-blue-50 px-1 py-1 rounded">
-                            <button
-                              onClick={() => updatePlayerBet(player.id, Math.max(1, (playerBets[player.id] || defaultBetAmount) - wagerIncrement))}
-                              className="w-6 h-6 flex items-center justify-center bg-blue-200 hover:bg-blue-300 rounded text-blue-700 font-bold text-xs"
-                            >
-                              -
-                            </button>
-                            <input
-                              type="number"
-                              min="1"
-                              max="100"
-                              value={playerBets[player.id] || defaultBetAmount}
-                              onChange={(e) => updatePlayerBet(player.id, parseInt(e.target.value) || 1)}
-                              className="w-8 text-center bg-transparent text-xs font-semibold text-blue-700 border-none outline-none"
-                            />
-                            <button
-                              onClick={() => updatePlayerBet(player.id, Math.min(100, (playerBets[player.id] || defaultBetAmount) + wagerIncrement))}
-                              className="w-6 h-6 flex items-center justify-center bg-blue-200 hover:bg-blue-300 rounded text-blue-700 font-bold text-xs"
-                            >
-                              +
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => setPicker({ playerId: player.id, kind: 'wager' })}
+                            className="min-h-[44px] px-3 rounded-lg bg-blue-50 text-blue-700 font-semibold text-sm hover:bg-blue-100 active:bg-blue-200 transition-colors"
+                            aria-label={`Set wager for ${player.displayName}`}
+                          >
+                            ${playerBets[player.id] || defaultBetAmount}
+                          </button>
                         )}
                         
                         {/* Press Button */}
@@ -743,11 +730,11 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
                         
                         {/* Score (tap to change) */}
                         <button
-                          onClick={() => setPickerPlayerId(player.id)}
-                          className="min-w-[3.5rem] min-h-[3rem] px-3 rounded-xl border-2 border-gray-200 bg-white hover:bg-gray-100 active:bg-gray-200 flex flex-col items-center justify-center transition-colors"
+                          onClick={() => setPicker({ playerId: player.id, kind: 'score' })}
+                          className="min-w-[2.75rem] min-h-[44px] px-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 active:bg-gray-200 flex flex-col items-center justify-center transition-colors"
                           aria-label={`Set score for ${player.displayName}`}
                         >
-                          <span className="text-2xl font-bold text-gray-900 leading-none">
+                          <span className="text-xl font-bold text-gray-900 leading-none">
                             {playerScore?.score || currentHole.par}
                           </span>
                           <span className="text-xs text-gray-500 mt-0.5">
@@ -838,20 +825,51 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
         </div>
       </div>
 
-      {pickerPlayerId && (() => {
-        const pickerPlayer = orderedPlayers.find(p => p.id === pickerPlayerId);
+      {picker && (() => {
+        const pickerPlayer = orderedPlayers.find(p => p.id === picker.playerId);
         if (!pickerPlayer) return null;
-        const pickerScore = currentScores.find(s => s.playerId === pickerPlayerId);
+
+        if (picker.kind === 'score') {
+          const pickerScore = currentScores.find(s => s.playerId === picker.playerId);
+          const current = pickerScore?.score || currentHole.par;
+          const base = Array.from({ length: 12 }, (_, i) => i + 1);
+          const values = base.includes(current) ? base : [...base, current].sort((a, b) => a - b);
+          return (
+            <PickerSheet
+              title={pickerPlayer.displayName}
+              subtitle={`Par ${currentHole.par}`}
+              values={values}
+              value={current}
+              highlightValue={currentHole.par}
+              formatSub={(n) => {
+                const d = n - currentHole.par;
+                return d === 0 ? 'Par' : d > 0 ? `+${d}` : `${d}`;
+              }}
+              onSelect={(score) => {
+                updateScore(picker.playerId, score);
+                setPicker(null);
+              }}
+              onClose={() => setPicker(null)}
+            />
+          );
+        }
+
+        const currentBet = playerBets[picker.playerId] || defaultBetAmount;
+        const values = WAGER_OPTIONS.includes(currentBet)
+          ? WAGER_OPTIONS
+          : [...WAGER_OPTIONS, currentBet].sort((a, b) => a - b);
         return (
-          <ScorePicker
-            playerName={pickerPlayer.displayName}
-            par={currentHole.par}
-            value={pickerScore?.score || currentHole.par}
-            onSelect={(score) => {
-              updateScore(pickerPlayerId, score);
-              setPickerPlayerId(null);
+          <PickerSheet
+            title={pickerPlayer.displayName}
+            subtitle="Wager"
+            values={values}
+            value={currentBet}
+            formatValue={(n) => `$${n}`}
+            onSelect={(amount) => {
+              updatePlayerBet(picker.playerId, amount);
+              setPicker(null);
             }}
-            onClose={() => setPickerPlayerId(null)}
+            onClose={() => setPicker(null)}
           />
         );
       })()}

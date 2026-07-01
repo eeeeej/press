@@ -1,30 +1,31 @@
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 
-interface ScorePickerProps {
-  playerName: string;
-  par: number;
+interface PickerSheetProps {
+  title: string;
+  subtitle?: string;
+  values: number[];
   value: number;
-  onSelect: (score: number) => void;
+  /** value to tint as a reference (e.g. par) */
+  highlightValue?: number;
+  columns?: number;
+  formatValue?: (n: number) => string;
+  formatSub?: (n: number) => string;
+  onSelect: (value: number) => void;
   onClose: () => void;
-  min?: number;
-  max?: number;
 }
 
-const relativeLabel = (score: number, par: number): string => {
-  const diff = score - par;
-  if (diff === 0) return 'Par';
-  return diff > 0 ? `+${diff}` : `${diff}`;
-};
-
-const ScorePicker: React.FC<ScorePickerProps> = ({
-  playerName,
-  par,
+const PickerSheet: React.FC<PickerSheetProps> = ({
+  title,
+  subtitle,
+  values,
   value,
+  highlightValue,
+  columns = 4,
+  formatValue = (n) => `${n}`,
+  formatSub,
   onSelect,
   onClose,
-  min = 1,
-  max = 12,
 }) => {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -34,23 +35,15 @@ const ScorePicker: React.FC<ScorePickerProps> = ({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const scores: number[] = [];
-  for (let n = min; n <= max; n++) scores.push(n);
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center"
       role="dialog"
       aria-modal="true"
-      aria-label={`Select score for ${playerName}`}
+      aria-label={title}
     >
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/40"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
-      {/* Sheet */}
       <div
         className="relative w-full max-w-lg bg-white rounded-t-2xl shadow-xl p-4"
         style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
@@ -59,8 +52,8 @@ const ScorePicker: React.FC<ScorePickerProps> = ({
 
         <div className="flex items-center justify-between mb-4">
           <div>
-            <div className="text-base font-semibold text-gray-900">{playerName}</div>
-            <div className="text-sm text-gray-500">Par {par}</div>
+            <div className="text-base font-semibold text-gray-900">{title}</div>
+            {subtitle && <div className="text-sm text-gray-500">{subtitle}</div>}
           </div>
           <button
             onClick={onClose}
@@ -71,30 +64,35 @@ const ScorePicker: React.FC<ScorePickerProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-4 gap-2">
-          {scores.map((n) => {
+        <div
+          className="grid gap-2"
+          style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+        >
+          {values.map((n) => {
             const isSelected = n === value;
-            const isPar = n === par;
+            const isRef = highlightValue !== undefined && n === highlightValue;
             return (
               <button
                 key={n}
                 onClick={() => onSelect(n)}
-                className={`min-h-[56px] rounded-xl flex flex-col items-center justify-center border-2 transition-colors ${
+                className={`min-h-[44px] py-1.5 rounded-xl flex flex-col items-center justify-center border-2 transition-colors ${
                   isSelected
                     ? 'border-emerald-600 bg-emerald-600 text-white'
-                    : isPar
+                    : isRef
                     ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
                     : 'border-gray-200 bg-gray-50 text-gray-900 hover:bg-gray-100'
                 }`}
               >
-                <span className="text-xl font-bold leading-none">{n}</span>
-                <span
-                  className={`text-[11px] leading-none mt-1 ${
-                    isSelected ? 'text-emerald-100' : 'text-gray-500'
-                  }`}
-                >
-                  {relativeLabel(n, par)}
-                </span>
+                <span className="text-lg font-bold leading-none">{formatValue(n)}</span>
+                {formatSub && (
+                  <span
+                    className={`text-[11px] leading-none mt-0.5 ${
+                      isSelected ? 'text-emerald-100' : 'text-gray-500'
+                    }`}
+                  >
+                    {formatSub(n)}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -104,4 +102,4 @@ const ScorePicker: React.FC<ScorePickerProps> = ({
   );
 };
 
-export default ScorePicker;
+export default PickerSheet;
