@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Player, Course, Game, HoleScore, PlayerScore, GameSummary } from '../types';
 import { calculateHandicapDiff, calculateBankerMatches, getNextBanker } from '../utils/gameLogic';
 import { useLocalStorage } from '../hooks/useLocalStorage';
-import { Minus, Plus, Crown, ArrowLeft, ArrowRight, DollarSign, Zap, LayoutGrid, List, ChevronUp, ChevronDown, Settings } from 'lucide-react';
+import { Crown, ArrowLeft, ArrowRight, DollarSign, Zap, LayoutGrid, List, ChevronUp, ChevronDown, Settings } from 'lucide-react';
 import ScoreCard from './ScoreCard';
 import LiveShareButton from './LiveShareButton';
+import ScorePicker from './ScorePicker';
 
 interface ScoringScreenProps {
   game: Game;
@@ -26,6 +27,7 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
   const [selectedBankerId, setSelectedBankerId] = useState<string>('');
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [activeTab, setActiveTab] = useState<'current' | 'summary' | 'config'>('current');
+  const [pickerPlayerId, setPickerPlayerId] = useState<string | null>(null);
 
   // Derived state and variables
   const currentHole = useMemo(() => {
@@ -466,7 +468,10 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-green-100">
       {/* Header */}
-      <div className="bg-white shadow-sm p-4">
+      <div
+        className="bg-white shadow-sm p-4"
+        style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top))' }}
+      >
         <div className="max-w-lg mx-auto">
           <div className="flex items-center justify-between mb-4">
             <button
@@ -600,7 +605,10 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
       </div>
 
       {/* Content */}
-      <div className="p-4">
+      <div
+        className="p-4"
+        style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+      >
         <div className="max-w-lg mx-auto">
           {activeTab === 'current' ? (
             <div className="bg-white rounded-2xl shadow-xl p-4">
@@ -614,7 +622,7 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
                   return (
                     <div
                       key={player.id}
-                      className={`flex items-center justify-between p-4 rounded-xl border-2 ${
+                      className={`flex items-center justify-between gap-x-2 gap-y-3 flex-wrap p-4 rounded-xl border-2 ${
                         isBanker 
                           ? 'border-amber-300 bg-amber-50' 
                           : 'border-gray-200 bg-gray-50'
@@ -723,7 +731,7 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
                         {/* Press Button */}
                         <button
                           onClick={() => isBanker ? setBankerPressed(!bankerPressed) : togglePress(player.id)}
-                          className={`p-2 rounded-lg transition-all ${
+                          className={`w-11 h-11 flex items-center justify-center rounded-lg transition-all ${
                             (isBanker ? bankerPressed : playerScore?.pressed)
                               ? 'bg-red-100 text-red-600 shadow-md' 
                               : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
@@ -733,34 +741,22 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
                           <Zap className="w-4 h-4" />
                         </button>
                         
-                        {/* Score Controls */}
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => updateScore(player.id, (playerScore?.score || currentHole.par) - 1)}
-                            className="w-8 h-8 bg-red-100 text-red-600 rounded-full flex items-center justify-center hover:bg-red-200 transition-colors"
-                          >
-                            <Minus className="w-4 h-4" />
-                          </button>
-                          
-                          <div className="w-12 text-center">
-                            <div className="text-2xl font-bold text-gray-900">
-                              {playerScore?.score || currentHole.par}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {((playerScore?.score || currentHole.par) - currentHole.par) === 0 ? 'Par' :
-                               ((playerScore?.score || currentHole.par) - currentHole.par) > 0 ? 
-                               `+${(playerScore?.score || currentHole.par) - currentHole.par}` :
-                               `${(playerScore?.score || currentHole.par) - currentHole.par}`}
-                            </div>
-                          </div>
-                          
-                          <button
-                            onClick={() => updateScore(player.id, (playerScore?.score || currentHole.par) + 1)}
-                            className="w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center hover:bg-green-200 transition-colors"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        </div>
+                        {/* Score (tap to change) */}
+                        <button
+                          onClick={() => setPickerPlayerId(player.id)}
+                          className="min-w-[3.5rem] min-h-[3rem] px-3 rounded-xl border-2 border-gray-200 bg-white hover:bg-gray-100 active:bg-gray-200 flex flex-col items-center justify-center transition-colors"
+                          aria-label={`Set score for ${player.displayName}`}
+                        >
+                          <span className="text-2xl font-bold text-gray-900 leading-none">
+                            {playerScore?.score || currentHole.par}
+                          </span>
+                          <span className="text-xs text-gray-500 mt-0.5">
+                            {((playerScore?.score || currentHole.par) - currentHole.par) === 0 ? 'Par' :
+                             ((playerScore?.score || currentHole.par) - currentHole.par) > 0 ?
+                             `+${(playerScore?.score || currentHole.par) - currentHole.par}` :
+                             `${(playerScore?.score || currentHole.par) - currentHole.par}`}
+                          </span>
+                        </button>
                       </div>
                     </div>
                   );
@@ -841,6 +837,24 @@ function ScoringScreen({ game, course, onGameUpdate, onFinishGame, liveShareEnab
           )}
         </div>
       </div>
+
+      {pickerPlayerId && (() => {
+        const pickerPlayer = orderedPlayers.find(p => p.id === pickerPlayerId);
+        if (!pickerPlayer) return null;
+        const pickerScore = currentScores.find(s => s.playerId === pickerPlayerId);
+        return (
+          <ScorePicker
+            playerName={pickerPlayer.displayName}
+            par={currentHole.par}
+            value={pickerScore?.score || currentHole.par}
+            onSelect={(score) => {
+              updateScore(pickerPlayerId, score);
+              setPickerPlayerId(null);
+            }}
+            onClose={() => setPickerPlayerId(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
